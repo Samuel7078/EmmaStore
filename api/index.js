@@ -8,6 +8,7 @@ require('dotenv').config();
 const app = express();
 app.use(cors());
 
+// Límites ampliados para soportar múltiples Base64 de alta resolución
 app.use(express.json({ limit: '100mb' })); 
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
@@ -35,12 +36,17 @@ const pool = mysql.createPool(dbConfig);
 
 async function uploadToCloudinary(images, folder) {
     const urls = [];
+    if (!images || !Array.isArray(images)) return urls;
+
     for (const img of images) {
-        // Si ya es una URL, no procesar
-        if (img.startsWith('http')) {
+        if (!img) continue;
+        
+        // Si ya es una URL de Cloudinary (ej. al editar), la mantenemos
+        if (typeof img === 'string' && img.startsWith('http')) {
             urls.push(img);
             continue;
         }
+        
         try {
             const res = await cloudinary.uploader.upload(img, {
                 folder: folder,
@@ -49,7 +55,7 @@ async function uploadToCloudinary(images, folder) {
             });
             urls.push(res.secure_url);
         } catch (error) {
-            console.error("Error detallado de Cloudinary:", error);
+            console.error(`Error en Cloudinary (${folder}):`, error);
             throw new Error("Fallo en la subida a Cloudinary");
         }
     }
@@ -113,23 +119,10 @@ app.get('/api/products', async (req, res) => {
 });
 
 app.post('/api/products', async (req, res) => {
-    // Extraemos los datos del cuerpo de la petición
-    const { 
-        name, 
-        price, 
-        description, 
-        images, 
-        categoryId, 
-        contactId, 
-        whatsappCustomMsg 
-    } = req.body;
-
+    const { name, price, description, images, categoryId, contactId, whatsappCustomMsg } = req.body;
     try {
-        // Subida a Cloudinary
-        const cloudinaryUrls = await uploadToCloudinary(images || [], 'products');
+        const cloudinaryUrls = await uploadToCloudinary(images, 'products');
         
-        // --- LIMPIEZA DE DATOS ---
-        // MySQL no acepta 'undefined'. Si el valor no existe, usamos null.
         const values = [
             name || null,
             price || 0,
@@ -141,13 +134,11 @@ app.post('/api/products', async (req, res) => {
         ];
 
         const sql = "INSERT INTO products (name, price, description, images, categoryId, contactId, whatsappCustomMsg) VALUES (?,?,?,?,?,?,?)";
-        
-        const [result] = await pool.execute(sql, values);
+        await pool.execute(sql, values);
         
         await createLog("CREAR_PRODUCTO", `Producto: ${name}`);
         res.json({ success: true });
     } catch (err) {
-        console.error("Error detallado en el servidor:", err);
         res.status(500).json({ error: err.message });
     }
 });
@@ -155,9 +146,12 @@ app.post('/api/products', async (req, res) => {
 app.put('/api/products/:id', async (req, res) => {
     const { name, price, description, images, categoryId, contactId, whatsappCustomMsg } = req.body;
     try {
-        const cloudinaryUrls = await uploadImages(images);
+        // CORRECCIÓN: Se usa la función helper correcta
+        const cloudinaryUrls = await uploadToCloudinary(images, 'products');
+        
         const sql = "UPDATE products SET name=?, price=?, description=?, images=?, categoryId=?, contactId=?, whatsappCustomMsg=? WHERE id=?";
         await pool.execute(sql, [name, price, description, JSON.stringify(cloudinaryUrls), categoryId, contactId, whatsappCustomMsg, req.params.id]);
+        
         await createLog("EDITAR_PRODUCTO", `ID: ${req.params.id}`);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -191,30 +185,37 @@ app.post('/api/contacts', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- STORIES (OPTIMIZADO WEBP) ---
+// --- STORIES (SOPORTE MÚLTIPLE E IGUAL QUE PRODUCTOS) ---
 
 app.get('/api/stories', async (req, res) => {
     try {
-        const limit24h = Date.now() - (24 * 60 * 60 * 1000); // Expiración automática
+        const limit24h = Date.now() - (24 * 60 * 60 * 1000);
         const [rows] = await pool.query("SELECT * FROM stories WHERE createdAt > ? ORDER BY id DESC", [limit24h]);
         res.json(rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/stories', async (req, res) => {
-    const { imageUrl, contactId, customMsg } = req.body;
+    // CORRECCIÓN: Ahora acepta un array de imágenes igual que productos
+    const { images, contactId, customMsg } = req.body;
     try {
-        const uploaded = await uploadToCloudinary([imageUrl], 'stories');
-        await pool.execute(
-            "INSERT INTO stories (imageUrl, contactId, customMsg, createdAt) VALUES (?,?,?,?)",
-            [uploaded[0], contactId, customMsg, Date.now()]
-        );
+        const uploaded = await uploadToCloudinary(images, 'stories');
+        
+        // Insertamos cada imagen como una story individual
+        for (const url of uploaded) {
+            await pool.execute(
+                "INSERT INTO stories (imageUrl, contactId, customMsg, createdAt) VALUES (?,?,?,?)",
+                [url, contactId, customMsg || "", Date.now()]
+            );
+        }
+        
+        await createLog("STORY", `Subidas ${uploaded.length} stories`);
         res.json({ success: true });
     } catch (err) {
-        console.error("Error en POST /api/stories:", err);
         res.status(500).json({ error: err.message });
     }
 });
+
 // --- HISTORIAL Y BORRADO ---
 
 app.get('/api/logs', async (req, res) => {

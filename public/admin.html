@@ -7,6 +7,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Estilos para transiciones suaves del panel */
+        #admin-sidebar { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #admin-main-container { transition: margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
 </head>
 <body class="bg-gray-50 font-sans overflow-x-hidden">
 
@@ -35,10 +41,15 @@
         </div>
     </div>
 
-    <div id="admin-content" class="hidden flex min-h-screen">
+    <div id="admin-content" class="hidden min-h-screen flex flex-col lg:flex-row">
         
-        <aside class="w-72 bg-black text-white p-10 flex flex-col fixed h-full shadow-2xl z-50">
-            <div class="mb-16">
+        <button id="nav-toggle-btn" onclick="toggleNav()" 
+            class="fixed top-6 left-6 z-[100] w-12 h-12 bg-black text-white rounded-2xl shadow-2xl flex items-center justify-center hover:scale-110 active:scale-90 transition-all">
+            <i class="fa-solid fa-bars"></i>
+        </button>
+
+        <aside id="admin-sidebar" class="fixed inset-y-0 left-0 w-72 bg-black text-white p-10 flex flex-col z-[90] shadow-2xl">
+            <div class="mb-16 mt-12 lg:mt-0">
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 bg-white text-black flex items-center justify-center font-black rounded-lg">E</div>
                     <div>
@@ -48,39 +59,39 @@
                 </div>
             </div>
 
-            <nav class="flex-1 space-y-2">
-                <button onclick="setAdminView('products')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all">
-                    <i class="fa-solid fa-box text-xs"></i>
+            <nav class="flex-1 space-y-2 overflow-y-auto no-scrollbar">
+                <button onclick="setAdminView('products')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all group">
+                    <i class="fa-solid fa-box text-xs group-hover:scale-125 transition-transform"></i>
                     <span class="text-[10px] font-black uppercase tracking-widest">Artículos</span>
                 </button>
                 
-                <button onclick="setAdminView('categories')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100">
-                    <i class="fa-solid fa-tags text-xs"></i>
+                <button onclick="setAdminView('categories')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100 group">
+                    <i class="fa-solid fa-tags text-xs group-hover:scale-125 transition-transform"></i>
                     <span class="text-[10px] font-black uppercase tracking-widest">Categorías</span>
                 </button>
                 
-                <button onclick="setAdminView('stories')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100">
-                    <i class="fa-solid fa-bolt text-xs"></i>
+                <button onclick="setAdminView('stories')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100 group">
+                    <i class="fa-solid fa-bolt text-xs group-hover:scale-125 transition-transform"></i>
                     <span class="text-[10px] font-black uppercase tracking-widest">Stories</span>
                 </button>
                 
-                <button onclick="setAdminView('team')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100">
-                    <i class="fa-solid fa-users text-xs"></i>
+                <button onclick="setAdminView('team')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100 group">
+                    <i class="fa-solid fa-users text-xs group-hover:scale-125 transition-transform"></i>
                     <span class="text-[10px] font-black uppercase tracking-widest">Equipo</span>
                 </button>
                 
-                <button onclick="setAdminView('logs')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100">
-                    <i class="fa-solid fa-list-check text-xs"></i>
+                <button onclick="setAdminView('logs')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100 group">
+                    <i class="fa-solid fa-list-check text-xs group-hover:scale-125 transition-transform"></i>
                     <span class="text-[10px] font-black uppercase tracking-widest">Historial</span>
                 </button>
 
-                <button onclick="setAdminView('settings')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100">
-                    <i class="fa-solid fa-gear text-xs"></i>
+                <button onclick="setAdminView('settings')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100 group">
+                    <i class="fa-solid fa-gear text-xs group-hover:scale-125 transition-transform"></i>
                     <span class="text-[10px] font-black uppercase tracking-widest">Ajustes</span>
                 </button>
             </nav>
 
-            <div class="pt-10 border-t border-white/10">
+            <div class="pt-10 border-t border-white/10 mt-6">
                 <button onclick="logoutAdmin()" class="flex items-center gap-4 text-red-400 hover:text-red-300 transition-colors group">
                     <i class="fa-solid fa-power-off text-xs group-hover:rotate-90 transition-transform duration-500"></i>
                     <span class="text-[9px] font-black uppercase tracking-widest">Cerrar Sesión</span>
@@ -88,14 +99,22 @@
             </div>
         </aside>
 
-        <main id="admin-main" class="ml-72 flex-1 p-16 bg-gray-50">
-            <div class="flex items-center justify-center h-full">
-                <div class="text-center opacity-20">
-                    <i class="fa-solid fa-circle-notch animate-spin text-4xl mb-4"></i>
-                    <p class="text-[10px] font-black uppercase tracking-widest">Sincronizando con Aiven MySQL...</p>
+        <main id="admin-main-container" class="flex-1 min-h-screen lg:ml-72 bg-gray-50 p-8 lg:p-16">
+            <div id="admin-main" class="max-w-7xl mx-auto h-full">
+                <div class="flex items-center justify-center h-[60vh]">
+                    <div class="text-center opacity-20">
+                        <i class="fa-solid fa-circle-notch animate-spin text-4xl mb-4 text-black"></i>
+                        <p class="text-[10px] font-black uppercase tracking-widest">Sincronizando con Aiven MySQL...</p>
+                    </div>
                 </div>
             </div>
         </main>
+    </div>
+
+    <div id="admin-toast" class="fixed bottom-10 right-10 z-[300] hidden animate-bounce">
+        <div class="bg-black text-white px-8 py-4 rounded-2xl shadow-2xl font-black text-[10px] uppercase tracking-widest">
+            Sincronización Exitosa
+        </div>
     </div>
 
     <script src="admin.js"></script>

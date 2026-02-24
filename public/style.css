@@ -32,10 +32,7 @@ body {
 }
 
 /* --- EFECTOS DE PRODUCTO (Luxury Grayscale) --- */
-.product-image {
-    filter: grayscale(100%);
-    transition: filter 0.5s ease, opacity 0.5s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-}
+
 
 @media (min-width: 1024px) {
     .product-card:hover .product-image {

@@ -7,7 +7,8 @@ const adminState = {
     stories: [],
     logs: [],
     tempImages: [],
-    isEditing: null 
+    isEditing: null,
+    isNavOpen: true // Estado para la barra desplegable
 };
 
 // --- PERSISTENCIA Y LOGIN ---
@@ -21,10 +22,8 @@ window.onload = () => {
 };
 
 async function checkAdminLogin() {
-    const passInput = document.getElementById('admin-pass');
+    const password = document.getElementById('admin-pass').value.trim();
     const rememberMe = document.getElementById('remember-me').checked;
-    const password = passInput.value.trim();
-
     try {
         const res = await fetch('/api/login', {
             method: 'POST',
@@ -32,19 +31,15 @@ async function checkAdminLogin() {
             body: JSON.stringify({ password })
         });
         const data = await res.json();
-
         if (res.ok && data.success) {
             if (rememberMe) localStorage.setItem('emma_admin_session', 'active_session_token');
             document.getElementById('admin-login').classList.add('hidden');
             document.getElementById('admin-content').classList.remove('hidden');
             loadAdminData();
         } else {
-            alert("Acceso denegado: " + (data.error || "Contraseña incorrecta"));
-            passInput.value = '';
+            alert("Contraseña incorrecta");
         }
-    } catch (err) {
-        alert("Error de red o servidor");
-    }
+    } catch (err) { alert("Error de conexión"); }
 }
 
 // --- CARGA DE DATOS ---
@@ -63,16 +58,32 @@ async function loadAdminData() {
         adminState.stories = s;
         adminState.logs = l;
         renderAdmin();
-    } catch (err) {
-        console.error("Error cargando datos:", err);
+    } catch (err) { console.error("Error cargando datos:", err); }
+}
+
+// --- NAVEGACIÓN Y BARRA DESPLEGABLE ---
+function toggleNav() {
+    adminState.isNavOpen = !adminState.isNavOpen;
+    const sidebar = document.getElementById('admin-sidebar');
+    const mainContent = document.getElementById('admin-main-container');
+    const toggleBtn = document.getElementById('nav-toggle-btn');
+
+    if (adminState.isNavOpen) {
+        sidebar.classList.remove('-translate-x-full');
+        mainContent.classList.add('lg:ml-64');
+        toggleBtn.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+    } else {
+        sidebar.classList.add('-translate-x-full');
+        mainContent.classList.remove('lg:ml-64');
+        toggleBtn.innerHTML = '<i class="fa-solid fa-bars"></i>';
     }
 }
 
-// --- NAVEGACIÓN ---
 function setAdminView(v) {
     adminState.view = v;
     adminState.isEditing = null;
     adminState.tempImages = [];
+    if (window.innerWidth < 1024) toggleNav(); // Cerrar nav al elegir en móvil
     renderAdmin();
 }
 
@@ -90,7 +101,7 @@ function renderAdmin() {
     else if (adminState.view === 'settings') renderSettingsView(main);
 }
 
-// --- GESTIÓN DE IMÁGENES ASÍNCRONA ---
+// --- GESTIÓN DE IMÁGENES ---
 async function handleImageUpload(input, single = false) {
     const files = Array.from(input.files);
     const previewContainer = document.getElementById('preview-container');
@@ -112,10 +123,13 @@ async function handleImageUpload(input, single = false) {
                 else adminState.tempImages.push(base64);
 
                 if (previewContainer) {
-                    const img = document.createElement('img');
-                    img.src = base64;
-                    img.className = "w-24 h-24 object-cover rounded-2xl shadow-md border-2 border-white animate-fade";
-                    previewContainer.appendChild(img);
+                    const div = document.createElement('div');
+                    div.className = "relative group animate-fade";
+                    div.innerHTML = `
+                        <img src="${base64}" class="w-24 h-24 object-cover rounded-2xl shadow-md border-2 border-white">
+                        <button type="button" onclick="removeTempImage(this, '${base64}')" class="absolute -top-2 -right-2 bg-red-500 text-white w-6 h-6 rounded-full text-xs shadow-lg flex items-center justify-center">×</button>
+                    `;
+                    previewContainer.appendChild(div);
                 }
                 resolve();
             };
@@ -127,7 +141,12 @@ async function handleImageUpload(input, single = false) {
     if(label) label.innerText = "¡Fotos Listas!";
 }
 
-// --- ENVÍO CON BARRA DE PROGRESO (XHR) ---
+function removeTempImage(btn, base64) {
+    adminState.tempImages = adminState.tempImages.filter(img => img !== base64);
+    btn.parentElement.remove();
+}
+
+// --- ENVÍO CON BARRA DE PROGRESO ---
 function sendWithProgress(url, method, data, callback) {
     const xhr = new XMLHttpRequest();
     const overlay = document.getElementById('upload-progress-overlay');
@@ -146,7 +165,7 @@ function sendWithProgress(url, method, data, callback) {
         if (e.lengthComputable) {
             const percent = Math.round((e.loaded / e.total) * 100);
             if (bar) bar.style.width = percent + '%';
-            if (text) text.innerText = `Subiendo a Cloudinary: ${percent}%`;
+            if (text) text.innerText = `Subiendo a la Nube: ${percent}%`;
         }
     };
 
@@ -158,24 +177,35 @@ function sendWithProgress(url, method, data, callback) {
                 callback();
             }, 1000);
         } else {
-            alert("Error en el servidor al procesar la imagen. Verifica el límite de tamaño y Cloudinary.");
+            alert("Error en el servidor.");
             if (overlay) overlay.classList.add('hidden');
         }
     };
     xhr.send(JSON.stringify(data));
 }
 
-// --- VISTAS ---
+// --- LÓGICA AUTO-MENSAJE WHATSAPP ---
+window.generateAutoMsg = () => {
+    const name = document.getElementById('prod-name')?.value.trim() || "[NOMBRE]";
+    const price = document.getElementById('prod-price')?.value.trim() || "[PRECIO]";
+    const msgInput = document.getElementById('whatsapp-msg-input');
+    
+    if(msgInput) {
+        msgInput.value = `Hola Emma Store! Estoy Interesad@ en: ${name} Precio: BS ${price}`;
+    }
+};
+
+// --- VISTAS: PRODUCTOS ---
 function renderProductsView(container) {
     container.innerHTML = `
-        <div class="flex justify-between items-center mb-12 animate-fade">
+        <div class="flex justify-between items-center mb-12 animate-fade px-4">
             <h2 class="text-4xl font-black uppercase tracking-tighter">Artículos</h2>
             <button onclick="showProductForm()" class="bg-black text-white px-8 py-4 rounded-full text-[10px] font-black uppercase shadow-xl">+ Nuevo</button>
         </div>
-        <div class="grid grid-cols-1 gap-4">
+        <div class="grid grid-cols-1 gap-4 px-4">
             ${adminState.products.map(p => `
                 <div class="bg-white p-6 rounded-[2.5rem] flex items-center gap-8 shadow-sm">
-                    <img src="${p.images[0]}" class="w-16 h-16 object-cover rounded-2xl grayscale">
+                    <img src="${p.images[0]}" class="w-16 h-16 object-cover rounded-2xl">
                     <div class="flex-1">
                         <p class="text-[11px] font-black uppercase">${p.name}</p>
                         <p class="text-[9px] opacity-40 font-bold">BS ${p.price}</p>
@@ -196,15 +226,15 @@ function showProductForm(prodId = null) {
     adminState.tempImages = prodId ? p.images : [];
 
     document.getElementById('admin-main').innerHTML = `
-        <div class="max-w-2xl mx-auto bg-white p-12 rounded-[3.5rem] shadow-2xl relative overflow-hidden">
+        <div class="max-w-2xl mx-auto bg-white p-6 lg:p-12 rounded-[3.5rem] shadow-2xl relative overflow-hidden">
             <div id="upload-progress-overlay" class="hidden absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center">
                 <div class="w-64 h-2 bg-gray-100 rounded-full overflow-hidden mb-4"><div id="upload-progress-bar" class="h-full bg-black w-0 transition-all"></div></div>
                 <p id="upload-progress-text" class="text-[10px] font-black uppercase">Iniciando...</p>
             </div>
             <h2 class="text-2xl font-black mb-10 uppercase tracking-tighter">${prodId ? 'Editar' : 'Nuevo'} Artículo</h2>
             <form onsubmit="handleProductSubmit(event)" class="space-y-4">
-                <input name="name" value="${p.name}" placeholder="Nombre" required class="w-full p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
-                <input name="price" type="number" step="0.01" value="${p.price}" placeholder="Precio BS" required class="w-full p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
+                <input id="prod-name" name="name" value="${p.name}" oninput="generateAutoMsg()" placeholder="Nombre" required class="w-full p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
+                <input id="prod-price" name="price" type="number" step="0.01" value="${p.price}" oninput="generateAutoMsg()" placeholder="Precio BS" required class="w-full p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
                 <select name="categoryId" required class="w-full p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
                     <option value="">Categoría...</option>
                     ${adminState.categories.map(c => `<option value="${c.id}" ${p.categoryId == c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
@@ -214,7 +244,18 @@ function showProductForm(prodId = null) {
                     ${adminState.contacts.map(v => `<option value="${v.id}" ${p.contactId == v.id ? 'selected' : ''}>${v.name}</option>`).join('')}
                 </select>
                 <textarea name="description" placeholder="Descripción" class="w-full p-5 bg-gray-50 rounded-2xl h-32 outline-none text-[10px] font-bold uppercase">${p.description}</textarea>
-                <div id="preview-container" class="flex flex-wrap gap-4 mb-4">${adminState.tempImages.map(img => `<img src="${img}" class="w-24 h-24 object-cover rounded-2xl">`).join('')}</div>
+                
+                <div class="bg-green-50 p-6 rounded-2xl border-2 border-dashed border-green-100">
+                    <p class="text-[9px] font-black uppercase mb-3 text-green-600 italic">Vista previa mensaje WhatsApp:</p>
+                    <textarea id="whatsapp-msg-input" name="whatsappCustomMsg" class="w-full p-4 bg-white rounded-xl h-24 outline-none text-[10px] font-bold uppercase shadow-inner border-none">${p.whatsappCustomMsg || ''}</textarea>
+                </div>
+
+                <div id="preview-container" class="flex flex-wrap gap-4 mb-4">${adminState.tempImages.map(img => `
+                    <div class="relative group">
+                        <img src="${img}" class="w-24 h-24 object-cover rounded-2xl shadow-md border-2 border-white">
+                        <button type="button" onclick="removeTempImage(this, '${img}')" class="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-6 rounded-full text-xs flex items-center justify-center">×</button>
+                    </div>`).join('')}
+                </div>
                 <input type="file" multiple onchange="handleImageUpload(this)" id="file-p" class="hidden">
                 <label for="file-p" class="block p-10 border-4 border-dashed rounded-[2.5rem] text-center cursor-pointer text-[10px] font-black uppercase opacity-40 hover:opacity-100 transition-all">Subir Imágenes</label>
                 <div class="flex gap-4 pt-6">
@@ -224,31 +265,28 @@ function showProductForm(prodId = null) {
             </form>
         </div>
     `;
+    if(!prodId) generateAutoMsg();
 }
 
 async function handleProductSubmit(e) {
     e.preventDefault();
     if (adminState.tempImages.length === 0) return alert("Selecciona al menos una imagen.");
-    
     const data = Object.fromEntries(new FormData(e.target));
     data.images = adminState.tempImages;
     const url = adminState.isEditing ? `/api/products/${adminState.isEditing}` : '/api/products';
-    
-    sendWithProgress(url, adminState.isEditing ? 'PUT' : 'POST', data, () => { 
-        loadAdminData(); 
-        setAdminView('products'); 
-    });
+    sendWithProgress(url, adminState.isEditing ? 'PUT' : 'POST', data, () => { loadAdminData(); setAdminView('products'); });
 }
 
+// --- VISTAS: STORIES ---
 function renderStoriesView(container) {
     container.innerHTML = `
-        <div class="relative max-w-4xl mx-auto overflow-hidden">
+        <div class="relative max-w-4xl mx-auto overflow-hidden px-4">
             <div id="upload-progress-overlay" class="hidden absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center">
                 <div class="w-48 h-2 bg-gray-100 rounded-full overflow-hidden mb-4"><div id="upload-progress-bar" class="h-full bg-black w-0"></div></div>
                 <p id="upload-progress-text" class="text-[9px] font-black uppercase">Subiendo Story...</p>
             </div>
             <h2 class="text-4xl font-black uppercase tracking-tighter mb-12">Stories (24h)</h2>
-            <div class="grid grid-cols-2 gap-12">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12">
                 <div class="bg-white p-10 rounded-[3rem] shadow-sm">
                     <form onsubmit="handleStorySubmit(event)" class="space-y-4">
                         <select name="contactId" required class="w-full p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
@@ -256,7 +294,7 @@ function renderStoriesView(container) {
                             ${adminState.contacts.map(v => `<option value="${v.id}">${v.name}</option>`).join('')}
                         </select>
                         <div id="preview-container" class="flex justify-center mb-4"></div>
-                        <input type="file" onchange="handleImageUpload(this, true)" id="file-s" class="hidden">
+                        <input type="file" multiple onchange="handleImageUpload(this, true)" id="file-s" class="hidden">
                         <label for="file-s" class="block p-10 border-2 border-dashed rounded-2xl text-center cursor-pointer text-[10px] font-black uppercase opacity-40">Añadir Foto</label>
                         <button type="submit" class="w-full bg-black text-white py-5 rounded-2xl font-black text-[10px] uppercase shadow-lg">Publicar</button>
                     </form>
@@ -275,22 +313,23 @@ function renderStoriesView(container) {
 async function handleStorySubmit(e) {
     e.preventDefault();
     if (adminState.tempImages.length === 0) return alert("Selecciona una imagen.");
-    
-    const data = Object.fromEntries(new FormData(e.target));
-    data.imageUrl = adminState.tempImages[0];
+    const data = {
+        contactId: new FormData(e.target).get('contactId'),
+        images: adminState.tempImages
+    };
     sendWithProgress('/api/stories', 'POST', data, () => { loadAdminData(); setAdminView('stories'); });
 }
 
-// --- MANTENER RESTO DE FUNCIONES (LOGS, CATEGORÍAS, EQUIPO, DELETE) ---
+// --- RENDERS RESTANTES ---
 
 function renderCategoriesView(container) {
     container.innerHTML = `
-        <h2 class="text-4xl font-black uppercase tracking-tighter mb-12">Categorías</h2>
-        <form onsubmit="handleCategorySubmit(event)" class="bg-white p-8 rounded-[2.5rem] mb-8 flex gap-4 shadow-sm">
+        <h2 class="text-4xl font-black uppercase tracking-tighter mb-12 px-4">Categorías</h2>
+        <form onsubmit="handleCategorySubmit(event)" class="bg-white p-8 rounded-[2.5rem] mb-8 flex gap-4 shadow-sm mx-4">
             <input name="name" placeholder="Nueva Categoría" required class="flex-1 p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
             <button type="submit" class="bg-black text-white px-10 rounded-2xl font-black text-[10px] uppercase">Agregar</button>
         </form>
-        <div class="grid grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 px-4">
             ${adminState.categories.map(c => `
                 <div class="bg-white p-8 rounded-[2.5rem] flex justify-between items-center shadow-sm">
                     <p class="text-[11px] font-black uppercase">${c.name}</p>
@@ -301,15 +340,22 @@ function renderCategoriesView(container) {
     `;
 }
 
+async function handleCategorySubmit(e) {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    await fetch('/api/categories', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    loadAdminData();
+}
+
 function renderTeamView(container) {
     container.innerHTML = `
-        <h2 class="text-4xl font-black uppercase tracking-tighter mb-12">Equipo</h2>
-        <form onsubmit="handleTeamSubmit(event)" class="bg-white p-8 rounded-[2.5rem] mb-8 flex gap-4 shadow-sm">
+        <h2 class="text-4xl font-black uppercase tracking-tighter mb-12 px-4">Equipo</h2>
+        <form onsubmit="handleTeamSubmit(event)" class="bg-white p-8 rounded-[2.5rem] mb-8 flex gap-4 shadow-sm mx-4">
             <input name="name" placeholder="Nombre" required class="flex-1 p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
             <input name="number" placeholder="591..." required class="flex-1 p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
             <button type="submit" class="bg-black text-white px-10 rounded-2xl font-black text-[10px] uppercase">Agregar</button>
         </form>
-        <div class="grid grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 px-4">
             ${adminState.contacts.map(v => `<div class="bg-white p-8 rounded-[2.5rem] flex justify-between items-center shadow-sm">
                 <p class="text-[11px] font-black uppercase">${v.name}</p>
                 <button onclick="deleteAction('contacts', ${v.id}, '${v.name}')" class="text-gray-200 hover:text-red-500"><i class="fa-solid fa-user-xmark"></i></button>
@@ -318,10 +364,17 @@ function renderTeamView(container) {
     `;
 }
 
+async function handleTeamSubmit(e) {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(e.target));
+    await fetch('/api/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+    loadAdminData();
+}
+
 function renderLogsView(container) {
     container.innerHTML = `
-        <h2 class="text-4xl font-black uppercase tracking-tighter mb-12">Historial</h2>
-        <div class="bg-white rounded-[3rem] shadow-sm overflow-hidden">
+        <h2 class="text-4xl font-black uppercase tracking-tighter mb-12 px-4">Historial</h2>
+        <div class="bg-white rounded-[3rem] shadow-sm overflow-hidden mx-4">
             <table class="w-full text-left">
                 <thead class="bg-gray-50 border-b">
                     <tr><th class="p-6 text-[10px] font-black uppercase">Acción</th><th class="p-6 text-[10px] font-black uppercase">Detalle</th><th class="p-6 text-[10px] font-black uppercase">Fecha</th></tr>
