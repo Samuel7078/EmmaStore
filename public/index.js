@@ -70,9 +70,9 @@ window.openStory = (index) => {
 function updateStoryUI() {
     const story = state.stories[state.activeStoryIndex];
     const vendor = state.contacts.find(c => c.id == story.contactId);
-    
+        
     document.getElementById('story-img').src = story.imageUrl;
-    document.getElementById('story-vendor').innerText = vendor ? vendor.name : "Emma Store";
+    document.getElementById('story-vendor').innerText = "Emma Store";
     document.getElementById('story-msg').innerText = story.customMsg || "Novedades exclusivas";
 
     // Renderizar barras de progreso
