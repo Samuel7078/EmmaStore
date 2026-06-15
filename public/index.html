@@ -142,9 +142,15 @@
                         <i class="fa-brands fa-facebook text-lg hover:text-black cursor-pointer transition-colors"></i>
                         <i class="fa-brands fa-tiktok text-lg hover:text-black cursor-pointer transition-colors"></i>
                     </div>
-                    <a href="#" onclick="event.preventDefault(); window.showPrivacyPolicy()" class="text-[9px] font-bold text-gray-400 hover:text-black uppercase tracking-widest hover:underline transition-colors mt-2">
-                        Políticas de Privacidad
-                    </a>
+                    <div class="flex items-center justify-center gap-4 mt-2">
+                        <a href="#" onclick="event.preventDefault(); window.showPrivacyPolicy()" class="text-[9px] font-bold text-gray-400 hover:text-black uppercase tracking-widest hover:underline transition-colors">
+                            Políticas de Privacidad
+                        </a>
+                        <span class="text-gray-300 text-[10px]">•</span>
+                        <a href="#" onclick="event.preventDefault(); window.showPrivacyPolicy()" class="text-[9px] font-bold text-gray-400 hover:text-black uppercase tracking-widest hover:underline transition-colors">
+                            Términos y Condiciones
+                        </a>
+                    </div>
                 </div>
             </div>
         </footer>
@@ -241,7 +247,7 @@
         <div class="relative bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl scale-90 transition-all duration-300 flex flex-col border border-gray-100 max-h-[80vh] overflow-y-auto custom-scrollbar" id="privacy-policy-card">
             <button onclick="window.closePrivacyPolicy()" class="absolute top-4 right-4 text-gray-300 hover:text-black text-3xl font-light p-1 select-none">&times;</button>
             
-            <h2 class="text-xl font-black text-black mb-4 uppercase tracking-tighter">Políticas de Privacidad</h2>
+            <h2 class="text-xl font-black text-black mb-4 uppercase tracking-tighter">Términos y Privacidad</h2>
             
             <div class="space-y-4 text-xs text-gray-600 font-medium leading-relaxed text-left">
                 <p>En Emma Store valoramos tu privacidad. A continuación te detallamos qué procedimientos realizamos con tu información:</p>
