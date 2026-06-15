@@ -49,7 +49,7 @@
             <i class="fa-solid fa-bars"></i>
         </button>
 
-        <aside id="admin-sidebar" class="fixed inset-y-0 left-0 w-72 bg-black text-white p-10 flex flex-col z-[90] shadow-2xl">
+        <aside id="admin-sidebar" class="fixed inset-y-0 left-0 w-72 bg-black text-white p-8 md:p-10 flex flex-col z-[90] shadow-2xl -translate-x-full lg:translate-x-0">
             <div class="mb-16 mt-12 lg:mt-0">
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 bg-white text-black flex items-center justify-center font-black rounded-lg">E</div>
@@ -81,6 +81,16 @@
                     <span class="text-[10px] font-black uppercase tracking-widest">Equipo</span>
                 </button>
                 
+                <button onclick="setAdminView('users')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100 group">
+                    <i class="fa-solid fa-user text-xs group-hover:scale-125 transition-transform"></i>
+                    <span class="text-[10px] font-black uppercase tracking-widest">Usuarios</span>
+                </button>
+                
+                <button onclick="setAdminView('orders')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100 group">
+                    <i class="fa-solid fa-box-open text-xs group-hover:scale-125 transition-transform"></i>
+                    <span class="text-[10px] font-black uppercase tracking-widest">Pedidos</span>
+                </button>
+                
                 <button onclick="setAdminView('logs')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100 group">
                     <i class="fa-solid fa-list-check text-xs group-hover:scale-125 transition-transform"></i>
                     <span class="text-[10px] font-black uppercase tracking-widest">Historial</span>
@@ -89,6 +99,10 @@
                 <button onclick="setAdminView('settings')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100 group">
                     <i class="fa-solid fa-gear text-xs group-hover:scale-125 transition-transform"></i>
                     <span class="text-[10px] font-black uppercase tracking-widest">Ajustes</span>
+                </button>
+                <button onclick="setAdminView('notifications')" class="admin-nav-item w-full flex items-center gap-4 py-4 px-6 rounded-2xl transition-all opacity-40 hover:opacity-100 group">
+                    <i class="fa-solid fa-envelope text-xs group-hover:scale-125 transition-transform"></i>
+                    <span class="text-[10px] font-black uppercase tracking-widest">Notificaciones</span>
                 </button>
             </nav>
 
@@ -100,7 +114,7 @@
             </div>
         </aside>
 
-        <main id="admin-main-container" class="flex-1 min-h-screen lg:ml-72 bg-gray-50 p-8 lg:p-16">
+        <main id="admin-main-container" class="flex-1 min-h-screen lg:ml-72 bg-gray-50 p-4 md:p-8 lg:p-16">
             <div id="admin-main" class="max-w-7xl mx-auto h-full">
                 <div class="flex items-center justify-center h-[60vh]">
                     <div class="text-center opacity-20">

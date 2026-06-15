@@ -27,12 +27,39 @@ body {
 .story-ring {
     padding: 3px;
     background: linear-gradient(white, white) padding-box,
-                linear-gradient(135deg, #000 0%, #666 100%) border-box;
+                linear-gradient(135deg, #bf953f 0%, #fcf6ba 25%, #b38728 50%, #fbf5b7 75%, #aa771c 100%) border-box;
     border: 2px solid transparent;
 }
 
 /* --- EFECTOS DE PRODUCTO (Luxury Grayscale) --- */
+.product-card {
+    opacity: 0;
+    transform: translateY(24px) scale(0.95);
+    transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), 
+                transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: opacity, transform;
+}
 
+.product-card.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+.product-card.exit-down {
+    opacity: 0;
+    transform: translateY(30px) scale(1.15) rotate(1.5deg);
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1), 
+                transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.product-card.visible:nth-child(1) { transition-delay: 0.03s; }
+.product-card.visible:nth-child(2) { transition-delay: 0.06s; }
+.product-card.visible:nth-child(3) { transition-delay: 0.09s; }
+.product-card.visible:nth-child(4) { transition-delay: 0.12s; }
+.product-card.visible:nth-child(5) { transition-delay: 0.15s; }
+.product-card.visible:nth-child(6) { transition-delay: 0.18s; }
+.product-card.visible:nth-child(7) { transition-delay: 0.21s; }
+.product-card.visible:nth-child(8) { transition-delay: 0.24s; }
 
 @media (min-width: 1024px) {
     .product-card:hover .product-image {
@@ -135,4 +162,49 @@ body {
     color: #fff;
     border-left: 2px solid white;
     padding-left: 1rem;
+}
+
+/* --- DUAL RANGE SLIDER STYLING --- */
+#price-filter-content input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    pointer-events: none;
+}
+#price-filter-content input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid black;
+    cursor: pointer;
+    pointer-events: auto;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    margin-top: -8px; /* Centered on track */
+    position: relative;
+    z-index: 10;
+}
+#price-filter-content input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid black;
+    cursor: pointer;
+    pointer-events: auto;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    position: relative;
+    z-index: 10;
+}
+#price-filter-content input[type="range"]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 4px;
+    background: transparent;
+}
+#price-filter-content input[type="range"]::-moz-range-track {
+    width: 100%;
+    height: 4px;
+    background: transparent;
 }

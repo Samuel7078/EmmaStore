@@ -3,12 +3,15 @@
   "version": "1.0.0",
   "main": "api/index.js",
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.0",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.9.0",
     "cors": "^2.8.6",
     "crypto": "^1.0.1",
     "dotenv": "^16.6.1",
     "express": "^4.22.1",
-    "mysql2": "^3.17.1"
+    "mysql2": "^3.17.1",
+    "nodemailer": "^9.0.0",
+    "pg": "^8.21.0"
   }
 }
