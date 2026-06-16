@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "api/index.js",
   "scripts": {
-    "build": "node scripts/generate-sitemap.js"
+    "vercel-build": "node scripts/generate-sitemap.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",

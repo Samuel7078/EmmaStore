@@ -569,12 +569,12 @@ async function sendOrderEmails(orderData, items) {
                     if (tokenData.access_token) {
                         const emailPayload = {
                             email: {
-                                html: emailHtml,
+                                html: Buffer.from(emailHtml).toString('base64'),
                                 text: `Pedido #${orderData.order_number} confirmado. Total: BOB ${orderData.total}`,
                                 subject: `Confirmación de pedido #${orderData.order_number} - Emma Store`,
                                 from: {
                                     name: 'Emma Store',
-                                    email: process.env.SENDPULSE_SENDER_EMAIL || 'pedidos@emmastore.com'
+                                    email: process.env.GMAIL_USER_2 || process.env.SENDPULSE_SENDER_EMAIL || 'pedidos@emmastore.com'
                                 },
                                 to: [{ name: orderData.contact_name, email: orderData.contact_email }]
                             }
@@ -1060,7 +1060,5 @@ app.post('/api/admin/emails/verify-otp', async (req, res) => {
         res.json({ success: true, message: "Correo verificado y agregado exitosamente" });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
-
 
 module.exports = app;
