@@ -423,6 +423,7 @@ window.stopCatalogHoverSlide = (el, first) => {
 
 // --- SISTEMA DE GOOGLE AUTH REAL (SUPABASE) ---
 window.openGoogleLogin = async () => {
+    localStorage.setItem('emma_terms_accepted', 'true');
     try {
         const { error } = await supabaseClient.auth.signInWithOAuth({
             provider: 'google',
@@ -542,6 +543,18 @@ window.openLoginHookModal = (actionPending = null) => {
     const modal = document.getElementById('login-hook-modal');
     const card = document.getElementById('login-hook-card');
     if (modal && card) {
+        const termsAccepted = localStorage.getItem('emma_terms_accepted') === 'true';
+        const checkboxContainer = document.getElementById('privacy-checkbox-container');
+        const checkbox = document.getElementById('privacy-accept-checkbox');
+        
+        if (termsAccepted && checkbox && checkboxContainer) {
+            checkbox.checked = true;
+            checkboxContainer.style.display = 'none';
+        } else if (checkboxContainer) {
+            checkboxContainer.style.display = '';
+        }
+        window.updateLoginButtonsState();
+
         modal.classList.remove('invisible', 'opacity-0');
         card.classList.remove('scale-90');
         card.classList.add('scale-100');
@@ -584,6 +597,7 @@ function handleLoginSuccess(supabaseUser, session) {
 }
 
 window.continueAsGuest = () => {
+    localStorage.setItem('emma_terms_accepted', 'true');
     state.user = null; // Ensure no user object exists
     state.supabaseSession = null;
     state.isGuest = true;

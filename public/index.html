@@ -261,7 +261,7 @@
             <h2 class="text-lg font-black text-black mb-2">🛒 ¡Estás a un paso!</h2>
             <p class="text-xs text-gray-400 font-bold leading-relaxed mb-6">Para confirmar tu pedido o consultar stock por WhatsApp, inicia sesión rápidamente con tu cuenta de Google o continúa como visitante.</p>
             
-            <label class="flex items-start gap-3 text-left mb-5 cursor-pointer bg-gray-50 p-3 rounded-xl border border-gray-100">
+            <label id="privacy-checkbox-container" class="flex items-start gap-3 text-left mb-5 cursor-pointer bg-gray-50 p-3 rounded-xl border border-gray-100">
                 <input type="checkbox" id="privacy-accept-checkbox" class="mt-0.5 rounded border-gray-300 text-black focus:ring-black w-4 h-4" onchange="window.updateLoginButtonsState()">
                 <span class="text-[9px] font-bold text-gray-500 uppercase tracking-widest leading-relaxed">
                     Acepto las <a href="#" onclick="event.preventDefault(); event.stopPropagation(); window.showPrivacyPolicy()" class="text-black hover:underline">Políticas de Privacidad</a> y el tratamiento de mis datos para envío.
