@@ -4,12 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Emma Store</title>
-  
+    
+    <!-- SEO Básico -->
+    <meta name="description" content="Emma Store Bolivia - La mejor tienda de accesorios, relojes y tecnología con envíos a todo el país">
+    <meta name="keywords" content="relojes, accesorios, tecnología, Emma Store, Bolivia, compras online">
+    <meta name="author" content="Emma Store">
+    <meta name="robots" content="index, follow">
+
+    <!-- Open Graph / Redes Sociales (Facebook, WhatsApp) -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Emma Store">
+    <meta property="og:description" content="Emma Store Bolivia - La mejor tienda de accesorios, relojes y tecnología con envíos a todo el país">
+    <meta property="og:image" content="https://tu-dominio.com/assets/logo.png">
+    <meta property="og:url" content="https://tu-dominio.com">
+    <meta property="og:site_name" content="Emma Store">
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Emma Store">
+    <meta name="twitter:description" content="Emma Store Bolivia - La mejor tienda de accesorios, relojes y tecnología con envíos a todo el país">
+    <meta name="twitter:image" content="https://tu-dominio.com/assets/logo.png">
+
     <link rel="icon" href="assets/logo.ico" type="image/ico">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Structured Data (JSON-LD) para e-commerce -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Emma Store",
+      "url": "https://tu-dominio.com",
+      "description": "Emma Store Bolivia - La mejor tienda de accesorios, relojes y tecnología con envíos a todo el país",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://tu-dominio.com/?search={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
     
 </head>
 <body class="bg-white text-black custom-scrollbar overflow-x-hidden">
@@ -250,13 +286,23 @@
             <h2 class="text-xl font-black text-black mb-4 uppercase tracking-tighter">Términos y Privacidad</h2>
             
             <div class="space-y-4 text-xs text-gray-600 font-medium leading-relaxed text-left">
+                <h3 class="font-black text-black uppercase tracking-wider text-[10px]">Políticas de Privacidad</h3>
                 <p>En Emma Store valoramos tu privacidad. A continuación te detallamos qué procedimientos realizamos con tu información:</p>
                 <ul class="list-disc pl-5 space-y-2">
                     <li><strong>Almacenamiento Local:</strong> Si utilizas el modo visitante, tus datos personales y carrito de compras se almacenan únicamente en tu dispositivo (caché local) y no en nuestros servidores, siendo compartidos exclusivamente a través de WhatsApp.</li>
                     <li><strong>Almacenamiento en Base de Datos:</strong> Si creas una cuenta o inicias sesión, tus pedidos y datos se guardan en nuestra base de datos segura para que puedas ver tu historial y agilizar futuras compras. Utilizamos estos datos estrictamente para el procesamiento de tus pedidos.</li>
-                    <li><strong>Uso Compartido de Datos:</strong> Para garantizar que tu pedido llegue a tu puerta, los datos de contacto y dirección de envío <strong>serán compartidos con los repartidores de nuestro negocio</strong>. En situaciones de alta demanda o fuerza mayor (el peor de los casos), nos reservamos el derecho de enviar tu pedido utilizando plataformas de transporte externas que operan en Bolivia (como inDrive, Yango o similares), compartiendo lo estrictamente necesario para la entrega.</li>
+                    <li><strong>Uso Compartido de Datos:</strong> Para garantizar que tu pedido llegue a tu puerta, los datos de contacto y dirección de envío <strong>serán compartidos con los repartidores de nuestro negocio</strong>. En situaciones de alta demanda o fuerza mayor, nos reservamos el derecho de enviar tu pedido utilizando plataformas de transporte externas que operan en Bolivia (como inDrive, Yango o similares), compartiendo lo estrictamente necesario para la entrega.</li>
                 </ul>
-                <p class="mt-4 italic">Al continuar con tu compra, aceptas estos términos de uso y manejo de datos.</p>
+
+                <h3 class="font-black text-black uppercase tracking-wider text-[10px] mt-6">Términos y Condiciones</h3>
+                <ul class="list-disc pl-5 space-y-2">
+                    <li><strong>Confirmación de Pedidos:</strong> Todos los pedidos realizados a través de la web están sujetos a confirmación de stock. Un asesor se contactará vía WhatsApp para validar tu compra.</li>
+                    <li><strong>Precios y Pagos:</strong> Los precios están expresados en Bolivianos (Bs.). El pago se coordina directamente con el vendedor asignado, ya sea mediante transferencia bancaria, QR o pago contra entrega (según disponibilidad geográfica).</li>
+                    <li><strong>Envíos y Entregas:</strong> Los tiempos de entrega varían según el departamento seleccionado. Emma Store no se hace responsable por demoras ocasionadas por bloqueos, paros o eventualidades de empresas de transporte de terceros.</li>
+                    <li><strong>Cambios y Devoluciones:</strong> Se aceptarán cambios únicamente por fallas de fábrica dentro de los primeros 3 días de recibido el producto, siempre y cuando este mantenga sus etiquetas y empaque original intacto.</li>
+                </ul>
+
+                <p class="mt-4 italic font-bold">Al interactuar con nuestra plataforma y continuar con tu compra, declaras haber leído y aceptado íntegramente estos términos de uso y manejo de datos.</p>
             </div>
             
             <button onclick="window.closePrivacyPolicy()" class="w-full mt-6 bg-black text-white py-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 transition-all flex items-center justify-center shadow-md active:scale-95">

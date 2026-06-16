@@ -984,7 +984,55 @@ window.toggleMobileSearch = () => {
     }
 };
 
+function updateSEOTags() {
+    let title = "Emma Store";
+    let desc = "Emma Store Bolivia - La mejor tienda de accesorios, relojes y tecnología con envíos a todo el país";
+    let img = "https://tu-dominio.com/assets/logo.png";
+    let url = window.location.href;
+
+    if (state.view === 'detail' && state.selectedProduct) {
+        title = `${state.selectedProduct.name} - Emma Store`;
+        desc = state.selectedProduct.description || desc;
+        if (state.selectedProduct.images && state.selectedProduct.images.length > 0) {
+            img = state.selectedProduct.images[0];
+        }
+    } else if (state.view === 'checkout') {
+        title = "Checkout - Emma Store";
+    }
+
+    // Actualizar document title
+    document.title = title;
+
+    // Actualizar meta description
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.content = desc;
+
+    // Actualizar Open Graph
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.content = title;
+    
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.content = desc;
+    
+    const ogImage = document.querySelector('meta[property="og:image"]');
+    if (ogImage) ogImage.content = img;
+    
+    const ogUrl = document.querySelector('meta[property="og:url"]');
+    if (ogUrl) ogUrl.content = url;
+
+    // Actualizar Twitter Cards
+    const twTitle = document.querySelector('meta[name="twitter:title"]');
+    if (twTitle) twTitle.content = title;
+    
+    const twDesc = document.querySelector('meta[name="twitter:description"]');
+    if (twDesc) twDesc.content = desc;
+    
+    const twImage = document.querySelector('meta[name="twitter:image"]');
+    if (twImage) twImage.content = img;
+}
+
 function render() {
+    updateSEOTags();
     const main = document.getElementById('main-view');
     if(!main) return;
     main.innerHTML = '';

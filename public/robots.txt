@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap dinámico
+Sitemap: https://tu-dominio.com/sitemap.xml

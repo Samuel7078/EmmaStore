@@ -1032,4 +1032,42 @@ app.post('/api/admin/emails/verify-otp', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- SITEMAP DINÁMICO (SEO) ---
+app.get('/api/sitemap', async (req, res) => {
+    try {
+        // En Vercel o producción, puedes ajustar el dominio base. 
+        // Por defecto usaremos el host que haga la petición si está disponible, o uno estático.
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+        const host = req.headers.host || 'tu-dominio.com';
+        const baseUrl = `${protocol}://${host}`;
+
+        const [products] = await pool.query("SELECT id FROM products ORDER BY id DESC");
+        const [categories] = await pool.query("SELECT id FROM categories");
+
+        let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+        xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+
+        // Home
+        xml += `  <url>\n    <loc>${baseUrl}/</loc>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n`;
+
+        // Categorías
+        for (const cat of categories) {
+            xml += `  <url>\n    <loc>${baseUrl}/?category=${cat.id}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
+        }
+
+        // Productos
+        for (const prod of products) {
+            xml += `  <url>\n    <loc>${baseUrl}/?product=${prod.id}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.9</priority>\n  </url>\n`;
+        }
+
+        xml += `</urlset>`;
+
+        res.header('Content-Type', 'application/xml');
+        res.send(xml);
+    } catch (err) {
+        console.error("Error generando sitemap:", err);
+        res.status(500).send("Error generando sitemap");
+    }
+});
+
 module.exports = app;
