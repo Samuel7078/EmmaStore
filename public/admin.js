@@ -954,15 +954,100 @@ function renderLogsView(container) {
 
 function renderSettingsView(container) {
     container.innerHTML = `
-        <div class="max-w-md mx-auto bg-white p-8 md:p-12 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl animate-fade">
-            <h2 class="text-xl md:text-2xl font-black mb-6 md:mb-8 uppercase tracking-tighter">Seguridad</h2>
-            <div class="space-y-4">
-                <input type="password" id="new-pass-1" placeholder="Nueva Contraseña" class="w-full p-4 md:p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
-                <input type="password" id="new-pass-2" placeholder="Confirmar" class="w-full p-4 md:p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
-                <button onclick="updatePassword()" class="w-full bg-black text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl cursor-pointer">Actualizar</button>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fade">
+            <div class="bg-white p-8 md:p-12 rounded-[2rem] md:rounded-[3.5rem] shadow-xl">
+                <h2 class="text-xl md:text-2xl font-black mb-6 md:mb-8 uppercase tracking-tighter">Seguridad</h2>
+                <div class="space-y-4">
+                    <input type="password" id="new-pass-1" placeholder="Nueva Contraseña" class="w-full p-4 md:p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
+                    <input type="password" id="new-pass-2" placeholder="Confirmar" class="w-full p-4 md:p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
+                    <button onclick="updatePassword()" class="w-full bg-black text-white py-4 md:py-5 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl cursor-pointer hover:scale-[1.02] active:scale-95 transition-all">Actualizar</button>
+                </div>
+            </div>
+
+            <div class="bg-white p-8 md:p-12 rounded-[2rem] md:rounded-[3.5rem] shadow-xl">
+                <h2 class="text-xl md:text-2xl font-black mb-6 md:mb-8 uppercase tracking-tighter">Correos y Cuotas</h2>
+                <div id="email-settings-content" class="text-center py-8">
+                    <i class="fa-solid fa-spinner fa-spin text-2xl text-gray-300"></i>
+                </div>
             </div>
         </div>
     `;
+    loadEmailSettings();
+}
+
+async function loadEmailSettings() {
+    try {
+        const res = await fetch('/api/admin/email-settings');
+        const data = await res.json();
+        const container = document.getElementById('email-settings-content');
+        if (!container) return;
+
+        const { config, env } = data;
+        const method = config.active_client_method;
+
+        container.innerHTML = `
+            <div class="space-y-6 text-left">
+                <!-- Admins -->
+                <div class="p-5 bg-gray-50 rounded-2xl">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Alertas Admin (Gmail 1)</p>
+                    <p class="font-bold text-sm mb-2">${env.gmailAdmin}</p>
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold bg-black text-white px-3 py-1 rounded-full">${config.count_admin_daily} hoy</span>
+                        <span class="text-[9px] text-gray-400 uppercase tracking-widest font-bold">Reseteo Diario</span>
+                    </div>
+                </div>
+
+                <!-- Clientes: Gmail 2 -->
+                <div class="p-5 rounded-2xl transition-all border-2 ${method === 'gmail2' ? 'border-black bg-white shadow-lg' : 'border-transparent bg-gray-50 opacity-60'}">
+                    <div class="flex items-start justify-between mb-2">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Clientes (Gmail Secundario)</p>
+                            <p class="font-bold text-sm">${env.gmail2}</p>
+                        </div>
+                        <button onclick="toggleEmailMethod('gmail2')" class="${method === 'gmail2' ? 'bg-black text-white' : 'bg-gray-200 text-gray-500'} px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all">
+                            ${method === 'gmail2' ? 'Activo' : 'Activar'}
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between mt-4">
+                        <span class="text-xs font-bold ${method === 'gmail2' ? 'bg-black text-white' : 'bg-gray-200 text-gray-500'} px-3 py-1 rounded-full">${config.count_gmail2_daily} hoy</span>
+                        <span class="text-[9px] text-gray-400 uppercase tracking-widest font-bold">Reseteo Diario</span>
+                    </div>
+                </div>
+
+                <!-- Clientes: SendPulse -->
+                <div class="p-5 rounded-2xl transition-all border-2 ${method === 'sendpulse' ? 'border-black bg-white shadow-lg' : 'border-transparent bg-gray-50 opacity-60'}">
+                    <div class="flex items-start justify-between mb-2">
+                        <div>
+                            <p class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Clientes (API SendPulse)</p>
+                            <p class="font-bold text-sm">${env.sendpulseSender}</p>
+                        </div>
+                        <button onclick="toggleEmailMethod('sendpulse')" class="${method === 'sendpulse' ? 'bg-black text-white' : 'bg-gray-200 text-gray-500'} px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all">
+                            ${method === 'sendpulse' ? 'Activo' : 'Activar'}
+                        </button>
+                    </div>
+                    <div class="flex items-center justify-between mt-4">
+                        <span class="text-xs font-bold ${method === 'sendpulse' ? 'bg-black text-white' : 'bg-gray-200 text-gray-500'} px-3 py-1 rounded-full">${config.count_sendpulse_total} en total</span>
+                        <span class="text-[9px] text-gray-400 uppercase tracking-widest font-bold">Acumulativo</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function toggleEmailMethod(method) {
+    try {
+        await fetch('/api/admin/email-settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active_client_method: method })
+        });
+        loadEmailSettings();
+    } catch (err) {
+        alert("Error al cambiar el método.");
+    }
 }
 
 async function updatePassword() {

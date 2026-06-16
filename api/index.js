@@ -40,6 +40,47 @@ const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
+// --- HELPERS: CONFIGURACIÓN DE CORREOS ---
+async function initEmailSettings() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS email_settings (
+            id INT PRIMARY KEY DEFAULT 1,
+            active_client_method VARCHAR(20) DEFAULT 'gmail2',
+            count_admin_daily INT DEFAULT 0,
+            count_gmail2_daily INT DEFAULT 0,
+            count_sendpulse_total INT DEFAULT 0,
+            last_reset_date DATE
+        )
+    `);
+    const [rows] = await pool.query("SELECT * FROM email_settings WHERE id = 1");
+    if (rows.length === 0) {
+        await pool.query("INSERT INTO email_settings (id, last_reset_date) VALUES (1, CURDATE())");
+    } else {
+        await pool.query(`
+            UPDATE email_settings 
+            SET count_admin_daily = 0, count_gmail2_daily = 0, last_reset_date = CURDATE()
+            WHERE id = 1 AND (last_reset_date IS NULL OR last_reset_date < CURDATE())
+        `);
+    }
+}
+
+async function getEmailConfig() {
+    await initEmailSettings();
+    const [rows] = await pool.query("SELECT * FROM email_settings WHERE id = 1");
+    return rows[0];
+}
+
+async function incrementEmailCount(type) {
+    await initEmailSettings();
+    if (type === 'admin') {
+        await pool.query("UPDATE email_settings SET count_admin_daily = count_admin_daily + 1 WHERE id = 1");
+    } else if (type === 'gmail2') {
+        await pool.query("UPDATE email_settings SET count_gmail2_daily = count_gmail2_daily + 1 WHERE id = 1");
+    } else if (type === 'sendpulse') {
+        await pool.query("UPDATE email_settings SET count_sendpulse_total = count_sendpulse_total + 1 WHERE id = 1");
+    }
+}
+
 // --- HELPERS: IMÁGENES Y SEGURIDAD ---
 
 async function uploadToCloudinary(images, folder) {
@@ -135,6 +176,32 @@ app.get('/api/config', (req, res) => {
         supabaseUrl: process.env.SUPABASE_URL,
         supabaseAnonKey: process.env.SUPABASE_ANON_KEY
     });
+});
+
+app.get('/api/admin/email-settings', async (req, res) => {
+    try {
+        const config = await getEmailConfig();
+        res.json({
+            config,
+            env: {
+                gmailAdmin: process.env.GMAIL_USER || 'No configurado',
+                gmail2: process.env.GMAIL_USER_2 || 'No configurado',
+                sendpulseSender: process.env.SENDPULSE_SENDER_EMAIL || process.env.GMAIL_USER_2 || 'pedidos@emmastore.com'
+            }
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/admin/email-settings', async (req, res) => {
+    try {
+        const { active_client_method } = req.body;
+        if (active_client_method !== 'sendpulse' && active_client_method !== 'gmail2') {
+            return res.status(400).json({ error: "Método inválido" });
+        }
+        await initEmailSettings();
+        await pool.query("UPDATE email_settings SET active_client_method = ? WHERE id = 1", [active_client_method]);
+        res.json({ success: true, method: active_client_method });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/admin/update-password', async (req, res) => {
@@ -552,7 +619,9 @@ async function sendOrderEmails(orderData, items) {
                 </div>
             `;
 
-            if (process.env.SENDPULSE_ACTIVE === 'true' && process.env.SENDPULSE_ID && process.env.SENDPULSE_SECRET) {
+            const emailConfig = await getEmailConfig();
+
+            if (emailConfig.active_client_method === 'sendpulse' && process.env.SENDPULSE_ID && process.env.SENDPULSE_SECRET) {
                 try {
                     // Obtener Token
                     const tokenRes = await fetch('https://api.sendpulse.com/oauth/access_token', {
@@ -591,6 +660,9 @@ async function sendOrderEmails(orderData, items) {
                         
                         const sendData = await sendRes.json();
                         console.log('Sendpulse API result:', sendData);
+                        if (sendRes.ok) {
+                            await incrementEmailCount('sendpulse');
+                        }
                     } else {
                         console.error("Error obteniendo token de SendPulse:", tokenData);
                     }
@@ -616,6 +688,7 @@ async function sendOrderEmails(orderData, items) {
                     
                     const info = await clientTransporter.sendMail(clientMailOptions);
                     console.log("Email cliente enviado vía Gmail secundario:", info.response);
+                    await incrementEmailCount('gmail2');
                 } catch (gmError) {
                     console.error("Error enviando email al cliente vía Gmail secundario:", gmError);
                 }
@@ -701,9 +774,10 @@ async function sendOrderEmails(orderData, items) {
                 };
                 try {
                     const info = await transporter.sendMail(mailOptions);
-                    console.log("Email admin enviado:", info.response);
-                } catch (error) {
-                    console.error("Error enviando email admin:", error);
+                    console.log("Email a admins enviado:", info.response);
+                    await incrementEmailCount('admin');
+                } catch (gmError) {
+                    console.error("Error enviando email admin:", gmError);
                 }
             }
         }
@@ -1018,6 +1092,7 @@ app.post('/api/admin/emails/send-otp', async (req, res) => {
         });
         
         console.log(`OTP guardado en BD y enviado a ${cleanEmail}: ${otpCode}`);
+        await incrementEmailCount('admin');
         res.json({ success: true, message: "Código enviado al correo" });
     } catch (err) {
         console.error("Error enviando OTP:", err);
