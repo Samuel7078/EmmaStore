@@ -477,7 +477,6 @@ app.get('/api/user/orders', requireAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- HELPERS: EMAILS ---
 const transporter = nodemailer.createTransport({
     service: 'gmail',
     auth: {
@@ -486,110 +485,136 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+
 async function sendOrderEmails(orderData, items) {
     try {
-        // 1. Enviar a cliente con SendPulse usando REST API nativo para evitar bugs de libuv en Windows
-        if (orderData.contact_email && process.env.SENDPULSE_ID && process.env.SENDPULSE_SECRET) {
-            try {
-                // Obtener Token
-                const tokenRes = await fetch('https://api.sendpulse.com/oauth/access_token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        grant_type: 'client_credentials',
-                        client_id: process.env.SENDPULSE_ID,
-                        client_secret: process.env.SENDPULSE_SECRET
-                    })
-                });
-                const tokenData = await tokenRes.json();
-                
-                if (tokenData.access_token) {
-                    const itemsHtml = items.map(i => `
-                        <tr>
-                            <td style="padding: 10px; border-bottom: 1px solid #eaeaea;">${i.product_name || i.name}</td>
-                            <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: center;">${i.quantity}</td>
-                            <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: right;">BOB ${(i.price * i.quantity).toFixed(2)}</td>
-                        </tr>
-                    `).join('');
+        // 1. Enviar a cliente
+        if (orderData.contact_email) {
+            const itemsHtml = items.map(i => `
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #eaeaea;">${i.product_name || i.name}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: center;">${i.quantity}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: right;">BOB ${(i.price * i.quantity).toFixed(2)}</td>
+                </tr>
+            `).join('');
+            
+            const emailHtml = `
+                <div style="font-family: Arial, sans-serif; max-width: 650px; margin: auto; border: 1px solid #eaeaea; border-radius: 12px; overflow: hidden; color: #333;">
+                    <div style="background-color: #000; color: #fff; padding: 25px; text-align: center;">
+                        <h2 style="margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 2px;">¡Gracias por tu compra, ${orderData.contact_name}!</h2>
+                        <p style="margin: 5px 0 0 0; color: #aaa;">Pedido #${orderData.order_number}</p>
+                    </div>
                     
-                    const emailHtml = `
-                        <div style="font-family: Arial, sans-serif; max-width: 650px; margin: auto; border: 1px solid #eaeaea; border-radius: 12px; overflow: hidden; color: #333;">
-                            <div style="background-color: #000; color: #fff; padding: 25px; text-align: center;">
-                                <h2 style="margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 2px;">¡Gracias por tu compra, ${orderData.contact_name}!</h2>
-                                <p style="margin: 5px 0 0 0; color: #aaa;">Pedido #${orderData.order_number}</p>
-                            </div>
-                            
-                            <div style="padding: 30px;">
-                                <p style="font-size: 16px;">Hemos recibido tu pedido exitosamente y ya lo estamos preparando.</p>
-                                
-                                <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 30px;">Resumen de tu Pedido</h3>
-                                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                                    <thead>
-                                        <tr style="background-color: #f9f9f9; text-transform: uppercase; font-size: 12px;">
-                                            <th style="padding: 10px; text-align: left; border-bottom: 2px solid #eaeaea;">Producto</th>
-                                            <th style="padding: 10px; text-align: center; border-bottom: 2px solid #eaeaea;">Cant.</th>
-                                            <th style="padding: 10px; text-align: right; border-bottom: 2px solid #eaeaea;">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${itemsHtml}
-                                    </tbody>
-                                    <tfoot>
-                                        <tr>
-                                            <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Subtotal</td>
-                                            <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.subtotal).toFixed(2)}</td>
-                                        </tr>
-                                        <tr>
-                                            <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Envío</td>
-                                            <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.shipping_cost).toFixed(2)}</td>
-                                        </tr>
-                                        <tr>
-                                            <td colspan="2" style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">Total</td>
-                                            <td style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">BOB ${Number(orderData.total).toFixed(2)}</td>
-                                        </tr>
-                                    </tfoot>
-                                </table>
+                    <div style="padding: 30px;">
+                        <p style="font-size: 16px;">Hemos recibido tu pedido exitosamente y ya lo estamos preparando.</p>
+                        
+                        <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 30px;">Resumen de tu Pedido</h3>
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                            <thead>
+                                <tr style="background-color: #f9f9f9; text-transform: uppercase; font-size: 12px;">
+                                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #eaeaea;">Producto</th>
+                                    <th style="padding: 10px; text-align: center; border-bottom: 2px solid #eaeaea;">Cant.</th>
+                                    <th style="padding: 10px; text-align: right; border-bottom: 2px solid #eaeaea;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsHtml}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Subtotal</td>
+                                    <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.subtotal).toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Envío</td>
+                                    <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.shipping_cost).toFixed(2)}</td>
+                                </tr>
+                                <tr>
+                                    <td colspan="2" style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">Total</td>
+                                    <td style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">BOB ${Number(orderData.total).toFixed(2)}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
 
-                                <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 30px;">Detalles de Entrega</h3>
-                                <p style="margin: 5px 0;"><strong>Dirección:</strong> ${orderData.shipping_address}</p>
-                                <p style="margin: 5px 0;"><strong>Ciudad:</strong> ${orderData.shipping_city}</p>
-                                <p style="margin: 15px 0;">Te contactaremos pronto por WhatsApp para coordinar la entrega.</p>
-                                
-                                <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eaeaea;">
-                                    <p style="color: #666; font-size: 12px; margin: 0;">Emma Store Bolivia</p>
-                                </div>
-                            </div>
+                        <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 30px;">Detalles de Entrega</h3>
+                        <p style="margin: 5px 0;"><strong>Dirección:</strong> ${orderData.shipping_address}</p>
+                        <p style="margin: 5px 0;"><strong>Ciudad:</strong> ${orderData.shipping_city}</p>
+                        <p style="margin: 15px 0;">Te contactaremos pronto por WhatsApp para coordinar la entrega.</p>
+                        
+                        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eaeaea;">
+                            <p style="color: #666; font-size: 12px; margin: 0;">Emma Store Bolivia</p>
                         </div>
-                    `;
-                    const emailPayload = {
-                        email: {
-                            html: emailHtml,
-                            text: `Pedido #${orderData.order_number} confirmado. Total: BOB ${orderData.total}`,
-                            subject: `Confirmación de pedido #${orderData.order_number} - Emma Store`,
-                            from: {
-                                name: 'Emma Store',
-                                email: process.env.SENDPULSE_SENDER_EMAIL || 'pedidos@emmastore.com'
-                            },
-                            to: [{ name: orderData.contact_name, email: orderData.contact_email }]
-                        }
-                    };
-                    
-                    const sendRes = await fetch('https://api.sendpulse.com/smtp/emails', {
+                    </div>
+                </div>
+            `;
+
+            if (process.env.SENDPULSE_ACTIVE === 'true' && process.env.SENDPULSE_ID && process.env.SENDPULSE_SECRET) {
+                try {
+                    // Obtener Token
+                    const tokenRes = await fetch('https://api.sendpulse.com/oauth/access_token', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${tokenData.access_token}`
-                        },
-                        body: JSON.stringify(emailPayload)
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            grant_type: 'client_credentials',
+                            client_id: process.env.SENDPULSE_ID,
+                            client_secret: process.env.SENDPULSE_SECRET
+                        })
+                    });
+                    const tokenData = await tokenRes.json();
+                    
+                    if (tokenData.access_token) {
+                        const emailPayload = {
+                            email: {
+                                html: emailHtml,
+                                text: `Pedido #${orderData.order_number} confirmado. Total: BOB ${orderData.total}`,
+                                subject: `Confirmación de pedido #${orderData.order_number} - Emma Store`,
+                                from: {
+                                    name: 'Emma Store',
+                                    email: process.env.SENDPULSE_SENDER_EMAIL || 'pedidos@emmastore.com'
+                                },
+                                to: [{ name: orderData.contact_name, email: orderData.contact_email }]
+                            }
+                        };
+                        
+                        const sendRes = await fetch('https://api.sendpulse.com/smtp/emails', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${tokenData.access_token}`
+                            },
+                            body: JSON.stringify(emailPayload)
+                        });
+                        
+                        const sendData = await sendRes.json();
+                        console.log('Sendpulse API result:', sendData);
+                    } else {
+                        console.error("Error obteniendo token de SendPulse:", tokenData);
+                    }
+                } catch (spError) {
+                    console.error("Error al enviar SendPulse vía API:", spError);
+                }
+            } else if (process.env.GMAIL_USER_2 && process.env.GMAIL_PASS_2) {
+                try {
+                    const clientTransporter = nodemailer.createTransport({
+                        service: 'gmail',
+                        auth: {
+                            user: process.env.GMAIL_USER_2,
+                            pass: process.env.GMAIL_PASS_2
+                        }
                     });
                     
-                    const sendData = await sendRes.json();
-                    console.log('Sendpulse API result:', sendData);
-                } else {
-                    console.error("Error obteniendo token de SendPulse:", tokenData);
+                    const clientMailOptions = {
+                        from: '"Emma Store" <' + process.env.GMAIL_USER_2 + '>',
+                        to: orderData.contact_email,
+                        subject: `Confirmación de pedido #${orderData.order_number} - Emma Store`,
+                        html: emailHtml
+                    };
+                    
+                    const info = await clientTransporter.sendMail(clientMailOptions);
+                    console.log("Email cliente enviado vía Gmail secundario:", info.response);
+                } catch (gmError) {
+                    console.error("Error enviando email al cliente vía Gmail secundario:", gmError);
                 }
-            } catch (spError) {
-                console.error("Error al enviar SendPulse vía API:", spError);
             }
         }
 
