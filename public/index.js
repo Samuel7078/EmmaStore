@@ -106,11 +106,22 @@ async function loadData() {
                 const { data: { session } } = await supabaseClient.auth.getSession();
                 if (session) {
                     state.supabaseSession = session;
+                    let phone = '';
+                    let dbName = '';
+                    try {
+                        const { data: profile } = await supabaseClient.from('profiles').select('*').eq('id', session.user.id).single();
+                        if (profile) {
+                            phone = profile.phone || '';
+                            dbName = profile.full_name || '';
+                        }
+                    } catch (e) { console.error(e); }
+                    
                     state.user = {
                         id: session.user.id,
-                        name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || '',
+                        name: dbName || session.user.user_metadata?.full_name || session.user.user_metadata?.name || session.user.email?.split('@')[0] || '',
                         email: session.user.email || '',
-                        photo: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || ''
+                        photo: session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || '',
+                        phone: phone
                     };
                     loadUserAddresses();
                 }
@@ -584,13 +595,19 @@ window.continueAsGuest = () => {
     }
 };
 
-window.showPrivacyPolicy = () => {
+window.showPrivacyPolicy = (updateUrl = true) => {
     const modal = document.getElementById('privacy-policy-modal');
     const card = document.getElementById('privacy-policy-card');
     if (modal && card) {
         modal.classList.remove('invisible', 'opacity-0');
         card.classList.remove('scale-90');
         card.classList.add('scale-100');
+        
+        if (updateUrl) {
+            const params = new URLSearchParams(window.location.search);
+            params.set('modal', 'privacy');
+            window.history.pushState({ ...history.state }, '', '?' + params.toString());
+        }
     }
 };
 
@@ -598,11 +615,16 @@ window.closePrivacyPolicy = () => {
     const modal = document.getElementById('privacy-policy-modal');
     const card = document.getElementById('privacy-policy-card');
     if (modal && card) {
+        modal.classList.add('invisible', 'opacity-0');
         card.classList.remove('scale-100');
         card.classList.add('scale-90');
-        setTimeout(() => {
-            modal.classList.add('invisible', 'opacity-0');
-        }, 150);
+        
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('modal') === 'privacy') {
+            params.delete('modal');
+            const newUrl = params.toString() ? '?' + params.toString() : window.location.pathname;
+            window.history.pushState({ ...history.state }, '', newUrl);
+        }
     }
 };
 
@@ -797,6 +819,16 @@ function syncStateFromURL(isInitial = false) {
     updateDepartmentUI();
 
     const scrollY = isInitial ? 0 : (history.state?.scrollY || 0);
+
+    // Restaurar estado de modales
+    if (urlParams.get('modal') === 'privacy') {
+        setTimeout(() => window.showPrivacyPolicy(false), 100);
+    } else {
+        const modal = document.getElementById('privacy-policy-modal');
+        if (modal && !modal.classList.contains('invisible')) {
+            window.closePrivacyPolicy();
+        }
+    }
 
     if (isInitial) {
         history.replaceState({
@@ -1227,17 +1259,34 @@ function renderCheckout(container) {
     const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const cache = JSON.parse(localStorage.getItem('emma_store_checkout_cache')) || {};
     
-    // Pre-llenar valores
-    const emailVal = cache.email || (state.user ? state.user.email : '');
-    const phoneVal = cache.phone || '';
-    const firstNameVal = cache.first_name || (state.user ? state.user.name.split(' ')[0] : '');
-    const lastNameVal = cache.last_name || (state.user ? state.user.name.split(' ').slice(1).join(' ') : '');
-    const addressVal = cache.address || '';
-    const mapsLinkVal = cache.maps_link || '';
-    const doorDescVal = cache.door_desc || '';
-    const apartmentVal = cache.apartment || '';
-    const cityVal = cache.city || state.selectedDepartment || 'Cochabamba';
-    const saveInfoChecked = cache.save_info !== false ? 'checked' : '';
+    // Determinar si es usuario logueado
+    const isLogged = !!state.user;
+    const hasAddresses = isLogged && state.addresses.length > 0;
+    
+    // Buscar la dirección por defecto o la primera si tiene
+    let defaultAddr = null;
+    if (hasAddresses) {
+        defaultAddr = state.addresses.find(a => a.is_default) || state.addresses[0];
+    }
+    
+    const emailVal = isLogged ? state.user.email : (cache.email || '');
+    const phoneVal = isLogged && state.user.phone ? state.user.phone : (cache.phone || '');
+    const firstNameVal = isLogged && state.user.name ? state.user.name.split(' ')[0] : (cache.first_name || '');
+    const lastNameVal = isLogged && state.user.name ? state.user.name.split(' ').slice(1).join(' ') : (cache.last_name || '');
+    
+    const addressVal = defaultAddr ? defaultAddr.street : (cache.address || '');
+    const mapsLinkVal = defaultAddr ? (defaultAddr.maps_link || '') : (cache.maps_link || '');
+    const doorDescVal = defaultAddr ? (defaultAddr.door_description || '') : (cache.door_desc || '');
+    const apartmentVal = defaultAddr ? (defaultAddr.apartment || '') : (cache.apartment || '');
+    const cityVal = defaultAddr ? defaultAddr.city : (cache.city || state.selectedDepartment || 'Cochabamba');
+    
+    // Lógica del checkbox de guardado según requerimiento del cliente
+    let saveInfoChecked = '';
+    if (isLogged) {
+        if (!hasAddresses) saveInfoChecked = 'checked';
+    } else {
+        saveInfoChecked = cache.save_info !== false ? 'checked' : '';
+    }
     
     // Costo inicial de envío (Express por defecto)
     let shippingCost = 15.00;
@@ -1278,8 +1327,31 @@ function renderCheckout(container) {
 
         <!-- Sección de Entrega -->
         <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-            <h2 class="text-xs font-black uppercase tracking-wider text-black mb-1 text-left">Entrega</h2>
+            <div class="flex justify-between items-center mb-1">
+                <h2 class="text-xs font-black uppercase tracking-wider text-black text-left">Entrega</h2>
+                ${isLogged ? `
+                    <button onclick="window.navigate('account')" class="text-[9px] font-bold text-blue-600 hover:underline">
+                        Agregar otra ubicación
+                    </button>
+                ` : ''}
+            </div>
+
+            ${hasAddresses ? `
+                <div class="flex flex-col gap-1.5 text-left mb-2">
+                    <label class="text-[8px] font-black uppercase tracking-widest text-gray-400">Mis Direcciones Guardadas</label>
+                    <select id="chk-saved-address" onchange="window.selectSavedAddress(this.value)" class="w-full px-4 py-3 border border-gray-200 rounded-xl text-[10px] bg-gray-50 font-bold focus:border-black outline-none transition-all uppercase cursor-pointer">
+                        ${state.addresses.map((a, idx) => `
+                            <option value="${idx}" ${defaultAddr && a.id === defaultAddr.id ? 'selected' : ''}>
+                                ${a.label} - ${a.street.substring(0, 30)}${a.street.length > 30 ? '...' : ''}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+            ` : ''}
             
+            <!-- Campo oculto para guardar el ID de la dirección seleccionada -->
+            <input type="hidden" id="chk-address-id" value="${defaultAddr ? defaultAddr.id : ''}">
+
             <!-- País -->
             <div class="flex flex-col gap-1.5 text-left">
                 <label class="text-[8px] font-black uppercase tracking-widest text-gray-400">País / Región</label>
@@ -1339,7 +1411,9 @@ function renderCheckout(container) {
             <!-- Guardar Información Checkbox -->
             <label class="flex items-center gap-2 cursor-pointer select-none mt-2 text-left">
                 <input type="checkbox" id="chk-save-info" ${saveInfoChecked} class="rounded border-gray-300 text-black focus:ring-black w-4 h-4">
-                <span class="text-[10px] text-gray-500 font-bold">Guardar mi información y consultar más rápidamente la próxima vez (en caché local)</span>
+                <span class="text-[10px] text-gray-500 font-bold">
+                    ${isLogged ? 'Guardar mi información en mi cuenta de Emma Store' : 'Guardar mi información y consultar más rápidamente la próxima vez (en caché local)'}
+                </span>
             </label>
         </div>
 
@@ -1516,6 +1590,18 @@ function renderCheckout(container) {
         }
     };
 
+    window.selectSavedAddress = (index) => {
+        const addr = state.addresses[index];
+        if (addr) {
+            document.getElementById('chk-address-id').value = addr.id;
+            document.getElementById('chk-address').value = addr.street || '';
+            document.getElementById('chk-maps-link').value = addr.maps_link || '';
+            document.getElementById('chk-door-desc').value = addr.door_description || '';
+            document.getElementById('chk-apartment').value = addr.apartment || '';
+            document.getElementById('chk-city').value = addr.city || '';
+        }
+    };
+
     window.submitCheckoutForm = async () => {
         // Campos
         const email = document.getElementById('chk-email').value.trim();
@@ -1617,21 +1703,64 @@ function renderCheckout(container) {
             loaderOverlay.classList.remove('hidden');
         }
         
-        // Guardar información en caché local si el checkbox está activo
+        // Guardar información en Supabase (si está logueado) o en caché (si es visitante)
         if (saveInfo) {
-            const checkoutCache = {
-                email,
-                phone,
-                first_name: firstName,
-                last_name: lastName,
-                address,
-                maps_link: mapsLink,
-                door_desc: doorDesc,
-                apartment,
-                city,
-                save_info: true
-            };
-            localStorage.setItem('emma_store_checkout_cache', JSON.stringify(checkoutCache));
+            if (state.user && supabaseClient) {
+                // Upsert Profile
+                supabaseClient.from('profiles').upsert({
+                    id: state.user.id,
+                    full_name: firstName + ' ' + lastName,
+                    phone: phone,
+                    email: email,
+                    updated_at: new Date()
+                }).then(res => {
+                    if (!res.error) {
+                        state.user.name = firstName + ' ' + lastName;
+                        state.user.phone = phone;
+                    }
+                });
+
+                // Update or Insert Address
+                const selectedAddressId = document.getElementById('chk-address-id')?.value;
+                if (selectedAddressId) {
+                    const original = state.addresses.find(a => a.id == selectedAddressId);
+                    if (original && (original.street !== address || original.city !== city || original.maps_link !== mapsLink || original.door_description !== doorDesc || original.apartment !== apartment)) {
+                        supabaseClient.from('addresses').update({
+                            street: address,
+                            city: city,
+                            maps_link: mapsLink,
+                            door_description: doorDesc,
+                            apartment: apartment,
+                            updated_at: new Date()
+                        }).eq('id', selectedAddressId).then(() => loadUserAddresses());
+                    }
+                } else {
+                    supabaseClient.from('addresses').insert({
+                        user_id: state.user.id,
+                        label: 'CASA',
+                        street: address,
+                        city: city,
+                        maps_link: mapsLink,
+                        door_description: doorDesc,
+                        apartment: apartment,
+                        is_default: state.addresses.length === 0
+                    }).then(() => loadUserAddresses());
+                }
+            } else {
+                const checkoutCache = {
+                    email,
+                    phone,
+                    first_name: firstName,
+                    last_name: lastName,
+                    address,
+                    maps_link: mapsLink,
+                    door_desc: doorDesc,
+                    apartment,
+                    city,
+                    save_info: true
+                };
+                localStorage.setItem('emma_store_checkout_cache', JSON.stringify(checkoutCache));
+            }
         } else {
             localStorage.removeItem('emma_store_checkout_cache');
         }
