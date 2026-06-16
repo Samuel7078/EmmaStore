@@ -643,7 +643,7 @@ async function sendOrderEmails(orderData, items) {
                                 subject: `Confirmación de pedido #${orderData.order_number} - Emma Store`,
                                 from: {
                                     name: 'Emma Store',
-                                    email: process.env.GMAIL_USER_2 || process.env.SENDPULSE_SENDER_EMAIL || 'pedidos@emmastore.com'
+                                    email: process.env.SENDPULSE_SENDER_EMAIL || process.env.GMAIL_USER_2 || 'pedidos@emmastore.com'
                                 },
                                 to: [{ name: orderData.contact_name, email: orderData.contact_email }]
                             }
