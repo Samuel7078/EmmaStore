@@ -542,7 +542,11 @@ async function sendOrderEmails(orderData, items) {
                         <p style="margin: 15px 0;">Te contactaremos pronto por WhatsApp para coordinar la entrega.</p>
                         
                         <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eaeaea;">
-                            <p style="color: #666; font-size: 12px; margin: 0;">Emma Store Bolivia</p>
+                            <p style="color: #666; font-size: 12px; margin-bottom: 10px; line-height: 1.5;">
+                                En caso de algún problema o si deseas cancelar tu pedido, <br>
+                                <a href="https://wa.me/${(orderData.seller_number || '').replace(/\D/g, '')}?text=${encodeURIComponent('Hola, tengo un problema con mi pedido #' + orderData.order_number)}" style="color: #000; font-weight: bold; text-decoration: underline;">escríbenos por WhatsApp aquí</a>.
+                            </p>
+                            <p style="color: #999; font-size: 11px; margin: 0;">Emma Store Bolivia</p>
                         </div>
                     </div>
                 </div>
