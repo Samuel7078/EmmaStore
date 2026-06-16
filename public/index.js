@@ -1327,30 +1327,28 @@ function renderCheckout(container) {
 
         <!-- Sección de Entrega -->
         <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-            <div class="flex justify-between items-center mb-1">
+            <div class="flex justify-between items-center mb-1 gap-2">
                 <h2 class="text-xs font-black uppercase tracking-wider text-black text-left">Entrega</h2>
                 ${isLogged ? `
-                    <button onclick="window.navigate('account')" class="text-[9px] font-bold text-blue-600 hover:underline">
-                        Agregar otra ubicación
-                    </button>
+                    <select id="chk-saved-address" onchange="window.selectSavedAddress(this.value)" class="max-w-[180px] px-2 py-1.5 border border-gray-200 rounded-lg text-[9px] bg-gray-50 font-bold focus:border-black outline-none transition-all uppercase cursor-pointer truncate">
+                        ${hasAddresses ? state.addresses.map((a, idx) => `
+                            <option value="${idx}" ${defaultAddr && a.id === defaultAddr.id ? 'selected' : ''}>
+                                ${a.label} - ${a.street.substring(0, 20)}${a.street.length > 20 ? '...' : ''}
+                            </option>
+                        `).join('') : ''}
+                        <option value="new" ${!hasAddresses ? 'selected' : ''}>+ Agregar dirección</option>
+                    </select>
                 ` : ''}
             </div>
-
-            ${hasAddresses ? `
-                <div class="flex flex-col gap-1.5 text-left mb-2">
-                    <label class="text-[8px] font-black uppercase tracking-widest text-gray-400">Mis Direcciones Guardadas</label>
-                    <select id="chk-saved-address" onchange="window.selectSavedAddress(this.value)" class="w-full px-4 py-3 border border-gray-200 rounded-xl text-[10px] bg-gray-50 font-bold focus:border-black outline-none transition-all uppercase cursor-pointer">
-                        ${state.addresses.map((a, idx) => `
-                            <option value="${idx}" ${defaultAddr && a.id === defaultAddr.id ? 'selected' : ''}>
-                                ${a.label} - ${a.street.substring(0, 30)}${a.street.length > 30 ? '...' : ''}
-                            </option>
-                        `).join('')}
-                    </select>
-                </div>
-            ` : ''}
             
             <!-- Campo oculto para guardar el ID de la dirección seleccionada -->
             <input type="hidden" id="chk-address-id" value="${defaultAddr ? defaultAddr.id : ''}">
+
+            <!-- Etiqueta de la dirección (solo visible si es nueva) -->
+            <div id="chk-address-label-container" class="relative text-left ${hasAddresses ? 'hidden' : ''}">
+                <input type="text" id="chk-address-label" placeholder="Nombre de la ubicación (Ej: CASA, OFICINA)" 
+                       class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium uppercase">
+            </div>
 
             <!-- País -->
             <div class="flex flex-col gap-1.5 text-left">
@@ -1408,13 +1406,6 @@ function renderCheckout(container) {
                 </div>
             </div>
 
-            <!-- Guardar Información Checkbox -->
-            <label class="flex items-center gap-2 cursor-pointer select-none mt-2 text-left">
-                <input type="checkbox" id="chk-save-info" ${saveInfoChecked} class="rounded border-gray-300 text-black focus:ring-black w-4 h-4">
-                <span class="text-[10px] text-gray-500 font-bold">
-                    ${isLogged ? 'Guardar mi información en mi cuenta de Emma Store' : 'Guardar mi información y consultar más rápidamente la próxima vez (en caché local)'}
-                </span>
-            </label>
         </div>
 
         <!-- Métodos de Envío -->
@@ -1590,15 +1581,27 @@ function renderCheckout(container) {
         }
     };
 
-    window.selectSavedAddress = (index) => {
-        const addr = state.addresses[index];
-        if (addr) {
-            document.getElementById('chk-address-id').value = addr.id;
-            document.getElementById('chk-address').value = addr.street || '';
-            document.getElementById('chk-maps-link').value = addr.maps_link || '';
-            document.getElementById('chk-door-desc').value = addr.door_description || '';
-            document.getElementById('chk-apartment').value = addr.apartment || '';
-            document.getElementById('chk-city').value = addr.city || '';
+    window.selectSavedAddress = (val) => {
+        if (val === 'new') {
+            document.getElementById('chk-address-id').value = '';
+            document.getElementById('chk-address').value = '';
+            document.getElementById('chk-maps-link').value = '';
+            document.getElementById('chk-door-desc').value = '';
+            document.getElementById('chk-apartment').value = '';
+            document.getElementById('chk-city').value = state.selectedDepartment || 'Cochabamba';
+            document.getElementById('chk-address-label-container').classList.remove('hidden');
+            document.getElementById('chk-address-label').value = '';
+        } else {
+            const addr = state.addresses[val];
+            if (addr) {
+                document.getElementById('chk-address-id').value = addr.id;
+                document.getElementById('chk-address').value = addr.street || '';
+                document.getElementById('chk-maps-link').value = addr.maps_link || '';
+                document.getElementById('chk-door-desc').value = addr.door_description || '';
+                document.getElementById('chk-apartment').value = addr.apartment || '';
+                document.getElementById('chk-city').value = addr.city || '';
+                document.getElementById('chk-address-label-container').classList.add('hidden');
+            }
         }
     };
 
@@ -1613,7 +1616,6 @@ function renderCheckout(container) {
         const doorDesc = document.getElementById('chk-door-desc').value.trim();
         const apartment = document.getElementById('chk-apartment').value.trim();
         const city = document.getElementById('chk-city').value.trim();
-        const saveInfo = document.getElementById('chk-save-info').checked;
         const isExpress = document.getElementById('ship-express').checked;
         
         // Validación
@@ -1704,65 +1706,61 @@ function renderCheckout(container) {
         }
         
         // Guardar información en Supabase (si está logueado) o en caché (si es visitante)
-        if (saveInfo) {
-            if (state.user && supabaseClient) {
-                // Upsert Profile
-                supabaseClient.from('profiles').upsert({
-                    id: state.user.id,
-                    full_name: firstName + ' ' + lastName,
-                    phone: phone,
-                    email: email,
-                    updated_at: new Date()
-                }).then(res => {
-                    if (!res.error) {
-                        state.user.name = firstName + ' ' + lastName;
-                        state.user.phone = phone;
-                    }
-                });
+        if (state.user && supabaseClient) {
+            // Upsert Profile
+            supabaseClient.from('profiles').upsert({
+                id: state.user.id,
+                full_name: firstName + ' ' + lastName,
+                phone: phone,
+                email: email,
+                updated_at: new Date()
+            }).then(res => {
+                if (!res.error) {
+                    state.user.name = firstName + ' ' + lastName;
+                    state.user.phone = phone;
+                }
+            });
 
-                // Update or Insert Address
-                const selectedAddressId = document.getElementById('chk-address-id')?.value;
-                if (selectedAddressId) {
-                    const original = state.addresses.find(a => a.id == selectedAddressId);
-                    if (original && (original.street !== address || original.city !== city || original.maps_link !== mapsLink || original.door_description !== doorDesc || original.apartment !== apartment)) {
-                        supabaseClient.from('addresses').update({
-                            street: address,
-                            city: city,
-                            maps_link: mapsLink,
-                            door_description: doorDesc,
-                            apartment: apartment,
-                            updated_at: new Date()
-                        }).eq('id', selectedAddressId).then(() => loadUserAddresses());
-                    }
-                } else {
-                    supabaseClient.from('addresses').insert({
-                        user_id: state.user.id,
-                        label: 'CASA',
+            // Update or Insert Address
+            const selectedAddressId = document.getElementById('chk-address-id')?.value;
+            if (selectedAddressId) {
+                const original = state.addresses.find(a => a.id == selectedAddressId);
+                if (original && (original.street !== address || original.city !== city || original.maps_link !== mapsLink || original.door_description !== doorDesc || original.apartment !== apartment)) {
+                    supabaseClient.from('addresses').update({
                         street: address,
                         city: city,
                         maps_link: mapsLink,
                         door_description: doorDesc,
                         apartment: apartment,
-                        is_default: state.addresses.length === 0
-                    }).then(() => loadUserAddresses());
+                        updated_at: new Date()
+                    }).eq('id', selectedAddressId).then(() => loadUserAddresses());
                 }
             } else {
-                const checkoutCache = {
-                    email,
-                    phone,
-                    first_name: firstName,
-                    last_name: lastName,
-                    address,
+                supabaseClient.from('addresses').insert({
+                    user_id: state.user.id,
+                    label: document.getElementById('chk-address-label')?.value.trim() || 'CASA',
+                    street: address,
+                    city: city,
                     maps_link: mapsLink,
-                    door_desc: doorDesc,
-                    apartment,
-                    city,
-                    save_info: true
-                };
-                localStorage.setItem('emma_store_checkout_cache', JSON.stringify(checkoutCache));
+                    door_description: doorDesc,
+                    apartment: apartment,
+                    is_default: state.addresses.length === 0
+                }).then(() => loadUserAddresses());
             }
         } else {
-            localStorage.removeItem('emma_store_checkout_cache');
+            const checkoutCache = {
+                email,
+                phone,
+                first_name: firstName,
+                last_name: lastName,
+                address,
+                maps_link: mapsLink,
+                door_desc: doorDesc,
+                apartment,
+                city,
+                save_info: true
+            };
+            localStorage.setItem('emma_store_checkout_cache', JSON.stringify(checkoutCache));
         }
         
         // Asignar vendedor aleatorio
