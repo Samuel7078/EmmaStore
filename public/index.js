@@ -1001,7 +1001,7 @@ window.toggleMobileSearch = () => {
 function updateSEOTags() {
     let title = "Emma Store";
     let desc = "Emma Store Bolivia - La mejor tienda de accesorios, relojes y tecnología con envíos a todo el país";
-    let img = "https://tu-dominio.com/assets/logo.png";
+    let img = "https://emmastore.qzz.io/assets/logo.png";
     let url = window.location.href;
 
     if (state.view === 'detail' && state.selectedProduct) {
@@ -1037,7 +1037,21 @@ function updateSEOTags() {
     // Actualizar Twitter Cards
     const twTitle = document.querySelector('meta[name="twitter:title"]');
     if (twTitle) twTitle.content = title;
-    
+
+    // Actualizar o crear Canonical Tag
+    let canonicalTag = document.querySelector('link[rel="canonical"]');
+    if (!canonicalTag) {
+        canonicalTag = document.createElement('link');
+        canonicalTag.rel = 'canonical';
+        document.head.appendChild(canonicalTag);
+    }
+    try {
+        const canonicalUrlObj = new URL(url);
+        canonicalUrlObj.searchParams.delete('modal'); // Limpiar params innecesarios
+        canonicalTag.href = canonicalUrlObj.toString();
+    } catch (e) {
+        canonicalTag.href = url;
+    }
     const twDesc = document.querySelector('meta[name="twitter:description"]');
     if (twDesc) twDesc.content = desc;
     

@@ -2,6 +2,9 @@
   "name": "emma-store-vercel",
   "version": "1.0.0",
   "main": "api/index.js",
+  "scripts": {
+    "build": "node scripts/generate-sitemap.js"
+  },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",
     "bcrypt": "^6.0.0",
