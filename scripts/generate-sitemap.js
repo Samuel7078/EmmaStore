@@ -25,22 +25,25 @@ async function generateSitemap() {
         const [products] = await connection.query("SELECT id FROM products ORDER BY id DESC");
         const [categories] = await connection.query("SELECT id FROM categories");
 
-        const baseUrl = process.env.DOMAIN_URL || 'https://emmastore.qzz.io';
+        let baseUrl = (process.env.DOMAIN_URL || 'https://emmastore.qzz.io').trim();
+        baseUrl = baseUrl.replace(/\/+$/, '');
         
         let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
         xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
 
+        const today = new Date().toISOString().split('T')[0];
+
         // Home
-        xml += `  <url>\n    <loc>${baseUrl}/</loc>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n`;
+        xml += `  <url>\n    <loc>${baseUrl}/</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n`;
 
         // Categorías
         for (const cat of categories) {
-            xml += `  <url>\n    <loc>${baseUrl}/?category=${cat.id}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
+            xml += `  <url>\n    <loc>${baseUrl}/?category=${cat.id}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
         }
 
         // Productos
         for (const prod of products) {
-            xml += `  <url>\n    <loc>${baseUrl}/?product=${prod.id}</loc>\n    <changefreq>weekly</changefreq>\n    <priority>0.9</priority>\n  </url>\n`;
+            xml += `  <url>\n    <loc>${baseUrl}/?product=${prod.id}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.9</priority>\n  </url>\n`;
         }
 
         xml += `</urlset>`;

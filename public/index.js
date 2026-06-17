@@ -64,6 +64,23 @@ async function loadData() {
         state.categories = cat;
         state.contacts = con;
         state.stories = s;
+
+        // Selección estable de categoría y producto aleatorio para la landing page
+        if (state.categories.length > 0) {
+            const randomCat = state.categories[Math.floor(Math.random() * state.categories.length)];
+            state.randomCategoryId = randomCat.id;
+            state.randomCategoryName = randomCat.name;
+        }
+        if (state.products.length > 0) {
+            const randomProd = state.products[Math.floor(Math.random() * state.products.length)];
+            state.randomProductId = randomProd.id;
+            
+            // Seleccionar 5 productos destacados estables para el carrusel de spotlight
+            const withDesc = state.products.filter(p => p.description && p.description.length > 20);
+            const sourceList = withDesc.length >= 3 ? withDesc : state.products;
+            state.spotlightProducts = [...sourceList].sort(() => 0.5 - Math.random()).slice(0, 5);
+        }
+        setTimeout(updateCatalogDropdown, 100);
         
         const prices = state.products.map(prod => prod.price);
         const minPrice = prices.length ? Math.min(...prices) : 0;
@@ -135,6 +152,9 @@ async function loadData() {
         alert("Hubo un error cargando los datos. Por favor recarga la página.");
     } finally {
         document.getElementById('loading-overlay')?.classList.add('hidden');
+        setTimeout(() => {
+            updateLogoTransition();
+        }, 150);
     }
 }
 
@@ -366,6 +386,12 @@ function updateCartUI() {
     const count = state.cart.reduce((s, i) => s + i.quantity, 0);
     document.getElementById('cart-count').innerText = count;
     document.getElementById('cart-count').classList.toggle('hidden', count === 0);
+    
+    const mobileBadge = document.getElementById('mobile-cart-badge');
+    if (mobileBadge) {
+        mobileBadge.innerText = count;
+        mobileBadge.classList.toggle('hidden', count === 0);
+    }
     document.getElementById('header-cart-total').innerText = `BS ${total.toFixed(2)}`;
     document.getElementById('cart-total').innerText = `BS ${total.toFixed(2)}`;
     const list = document.getElementById('cart-items-list');
@@ -688,7 +714,13 @@ function updateAccountUI() {
         if (state.user) {
             const firstName = state.user.name.split(' ')[0];
             accountBtn.innerHTML = `
-                ${state.user.photo ? `<img src="${state.user.photo}" class="w-6 h-6 rounded-full border border-gray-200 object-cover">` : `<i class="fa-regular fa-user text-xs md:text-sm text-black"></i>`}
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                    ${state.user.photo ? `<img src="${state.user.photo}" class="w-6 h-6 rounded-full border border-gray-200 object-cover">` : `<i class="fa-regular fa-user text-xs md:text-sm text-black"></i>`}
+                    <div id="mobile-profile-label" class="flex flex-col sm:hidden items-start leading-[1.0] text-left overflow-hidden transition-all duration-75 text-[9px] font-black uppercase tracking-wider text-gray-400 max-w-[80px]">
+                        <span class="text-[7px] opacity-65">Cuenta</span>
+                        <span class="text-[9px] text-black font-black truncate max-w-[60px]">${firstName}</span>
+                    </div>
+                </div>
                 <div class="hidden sm:flex flex-col items-start leading-[1.1] text-left">
                     <span class="text-[9px] font-black uppercase tracking-wider text-gray-400">Hola, ${firstName}</span>
                     <span class="text-xs font-black text-black">Mi Cuenta</span>
@@ -696,7 +728,13 @@ function updateAccountUI() {
             `;
         } else {
             accountBtn.innerHTML = `
-                <i class="fa-regular fa-user text-xs md:text-sm text-black"></i>
+                <div class="flex items-center gap-1.5 sm:gap-2">
+                    <i class="fa-regular fa-user text-xs md:text-sm text-black"></i>
+                    <div id="mobile-profile-label" class="flex flex-col sm:hidden items-start leading-[1.0] text-left overflow-hidden transition-all duration-75 text-[9px] font-black uppercase tracking-wider text-gray-400 max-w-[80px]">
+                        <span class="text-[7px] opacity-65">Hola</span>
+                        <span class="text-[9px] text-black font-black truncate max-w-[60px]">Invitado</span>
+                    </div>
+                </div>
                 <div class="hidden sm:flex flex-col items-start leading-[1.1] text-left">
                     <span class="text-[9px] font-black uppercase tracking-wider text-gray-400">Hola, Identifícate</span>
                     <span class="text-xs font-black text-black">Mi Cuenta</span>
@@ -804,10 +842,14 @@ function initRouter() {
 
 function syncStateFromURL(isInitial = false) {
     const urlParams = new URLSearchParams(window.location.search);
-    const view = urlParams.get('view') || 'home';
+    let view = urlParams.get('view') || 'home';
     const category = urlParams.get('category') || 'todas';
     const productId = urlParams.get('product');
     const search = urlParams.get('search') || '';
+
+    if (category !== 'todas' && view === 'home') {
+        view = 'catalog';
+    }
 
     state.view = view;
     state.selectedCategory = category;
@@ -868,7 +910,284 @@ function updateHeaderUI() {
             backBtn.classList.add('hidden');
         }
     }
+
+    // Actualizar estilos activos de pestañas de navegación
+    const btnHome = document.getElementById('nav-btn-home');
+    const btnCatalog = document.getElementById('nav-btn-catalog');
+
+    if (btnHome) {
+        if (state.view === 'home') {
+            btnHome.classList.add('text-black');
+            btnHome.classList.remove('text-gray-500');
+        } else {
+            btnHome.classList.remove('text-black');
+            btnHome.classList.add('text-gray-500');
+        }
+    }
+    if (btnCatalog) {
+        if (state.view === 'catalog') {
+            btnCatalog.classList.add('text-black');
+            btnCatalog.classList.remove('text-gray-500');
+        } else {
+            btnCatalog.classList.remove('text-black');
+            btnCatalog.classList.add('text-gray-500');
+        }
+    }
+
+    // Actualizar estilos activos de pestañas móviles
+    const mobileHome = document.getElementById('mobile-tab-home');
+    const mobileCatalog = document.getElementById('mobile-tab-catalog');
+
+    if (mobileHome) {
+        if (state.view === 'home') {
+            mobileHome.classList.add('text-black');
+            mobileHome.classList.remove('text-gray-400');
+        } else {
+            mobileHome.classList.remove('text-black');
+            mobileHome.classList.add('text-gray-400');
+        }
+    }
+    if (mobileCatalog) {
+        if (state.view === 'catalog') {
+            mobileCatalog.classList.add('text-black');
+            mobileCatalog.classList.remove('text-gray-400');
+        } else {
+            mobileCatalog.classList.remove('text-black');
+            mobileCatalog.classList.add('text-gray-400');
+        }
+    }
+
+    // Ejecutar transiciones de logo al actualizar UI de cabecera
+    setTimeout(updateLogoTransition, 50);
 }
+
+function updateCatalogDropdown() {
+    const dropdown = document.getElementById('catalog-dropdown');
+    if (!dropdown) return;
+    dropdown.innerHTML = `
+        <button onclick="window.filterCategory('todas')" class="w-full text-left px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider text-gray-500 hover:bg-gray-50 hover:text-black transition-all flex items-center justify-between">
+            Todas <i class="fa-solid fa-chevron-right text-[8px] opacity-40"></i>
+        </button>
+    ` + state.categories.map(c => `
+        <button onclick="window.filterCategory(${c.id})" class="w-full text-left px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider text-gray-500 hover:bg-gray-50 hover:text-black transition-all flex items-center justify-between">
+            ${c.name} <i class="fa-solid fa-chevron-right text-[8px] opacity-40"></i>
+        </button>
+    `).join('');
+}
+
+function updateLogoTransition() {
+    // Sincronizar el header logo text y el logo de hero en móvil
+    const headerLogoText = document.getElementById('header-logo-text');
+    const headerLogoImg = document.getElementById('header-logo-img');
+    const heroBrandingText = document.getElementById('hero-branding-text');
+    const heroLogoImgMobile = document.getElementById('hero-logo-img-mobile');
+    const descText = document.getElementById('hero-desc-text');
+    const header = document.getElementById('main-header');
+    
+    const searchContainer = document.getElementById('mobile-header-search-container');
+    const accountContainer = document.getElementById('account-menu-container');
+    const mobileProfileLabel = document.getElementById('mobile-profile-label');
+    const mobileSearchInput = document.getElementById('mobile-search-input-header');
+
+    if (state.view !== 'home') {
+        // Restaurar estado normal del logo y header en otras vistas
+        if (headerLogoText) {
+            headerLogoText.style.opacity = '1';
+            headerLogoText.style.clipPath = '';
+        }
+        if (headerLogoImg) {
+            headerLogoImg.style.opacity = '1';
+            headerLogoImg.style.transform = '';
+        }
+        if (descText) {
+            descText.style.transform = '';
+        }
+        if (header) {
+            header.classList.remove('bg-transparent', 'border-transparent');
+            header.classList.add('bg-white/80', 'backdrop-blur-xl', 'border-gray-50', 'shadow-sm');
+        }
+        if (searchContainer) {
+            searchContainer.style.width = '36px';
+            searchContainer.style.transform = '';
+            searchContainer.style.position = '';
+            searchContainer.style.left = '';
+            searchContainer.style.top = '';
+        }
+        if (mobileSearchInput) {
+            mobileSearchInput.style.opacity = '0';
+        }
+        if (accountContainer) {
+            accountContainer.style.transform = '';
+            accountContainer.style.position = '';
+            accountContainer.style.left = '';
+            accountContainer.style.top = '';
+        }
+        if (mobileProfileLabel) {
+            mobileProfileLabel.style.opacity = '0';
+            mobileProfileLabel.style.maxWidth = '0px';
+        }
+        return;
+    }
+
+    const scrollY = window.scrollY;
+    const threshold = 150; // Distancia de scroll para completar la animación
+    const progress = Math.min(scrollY / threshold, 1);
+
+    // Desvanecer y escribir el texto del header logo hacia adentro (simulando escritura al bajar, y borrado al subir)
+    if (headerLogoText) {
+        headerLogoText.style.opacity = progress;
+        const clipPercentage = 100 - (progress * 100);
+        headerLogoText.style.clipPath = `inset(0 ${clipPercentage}% 0 0)`;
+    }
+
+    // Logo morphing transition
+    if (heroLogoImgMobile) {
+        if (progress < 0.99) {
+            heroLogoImgMobile.style.opacity = '1';
+            // Counteract scroll and scale down
+            const scale = 1 - 0.58 * progress;
+            // Adjust translation to align vertically with the header logo center
+            const transY = scrollY - (52 * progress);
+            heroLogoImgMobile.style.transform = `translateY(${transY}px) scale(${scale})`;
+            heroLogoImgMobile.style.transformOrigin = 'left center';
+            heroLogoImgMobile.style.zIndex = '50';
+        } else {
+            heroLogoImgMobile.style.opacity = '0';
+        }
+    }
+
+    if (headerLogoImg) {
+        headerLogoImg.style.opacity = progress >= 0.99 ? '1' : '0';
+    }
+
+    // Animate search container width and opacity on scroll progress (0.2 to 0.8)
+    const p_search = Math.max(0, Math.min((progress - 0.2) / 0.6, 1));
+    const p_profile = Math.min(progress / 0.5, 1);
+    
+    // Animate translations (slide search and profile to the left when at scroll = 0)
+    if (searchContainer && accountContainer && window.innerWidth < 1280) { // Only on mobile/tablet viewports
+        const W = window.innerWidth;
+        const padding = W >= 640 ? 24 : 16;
+        const gap = W >= 768 ? 16 : 8;
+        const cartW = 40;
+        
+        let startSearch = W >= 640 ? 170 : 130;
+        
+        // Calculate dynamic profile label text width
+        let textWidth = 48; // Default for "Invitado"
+        if (state.user && state.user.name) {
+            const firstName = state.user.name.split(' ')[0];
+            textWidth = Math.max(30, Math.min(60, firstName.length * 8));
+        }
+        let startAccount = 54 + textWidth; // ~102px for Guest
+        
+        // Dynamically cap startSearch and startAccount on narrow screens to prevent overflow
+        const maxAvailableForTwo = W - padding - padding - cartW - gap - gap;
+        if (startSearch + startAccount > maxAvailableForTwo) {
+            const overflow = (startSearch + startAccount) - maxAvailableForTwo;
+            startSearch = Math.max(90, startSearch - overflow * 0.6);
+            startAccount = Math.max(80, startAccount - overflow * 0.4);
+        }
+        
+        const currentSearchW = startSearch - (startSearch - 36) * p_search;
+        const currentAccountW = startAccount - (startAccount - 36) * p_profile;
+        
+        // Fast fade-outs for text content to prevent clipped overlaps
+        const p_profile_fade = Math.min(progress / 0.2, 1);
+        const p_search_fade = Math.max(0, Math.min((progress - 0.2) / 0.3, 1));
+        
+        // Apply absolute positioning styles to bypass standard flex layout flow
+        searchContainer.style.position = 'absolute';
+        searchContainer.style.left = '0px';
+        searchContainer.style.top = '50%';
+        
+        accountContainer.style.position = 'absolute';
+        accountContainer.style.left = '0px';
+        accountContainer.style.top = '50%';
+        
+        // Apply widths
+        searchContainer.style.width = `${currentSearchW}px`;
+        if (mobileSearchInput) {
+            mobileSearchInput.style.opacity = 1 - p_search_fade;
+        }
+        if (mobileProfileLabel) {
+            mobileProfileLabel.style.opacity = 1 - p_profile_fade;
+            mobileProfileLabel.style.maxWidth = `${Math.max(0, currentAccountW - 36)}px`;
+        }
+        
+        // Target positions in absolute coordinates
+        const cartLeft = W - padding - cartW;
+        const unTransAccountLeft1 = cartLeft - gap - 36;
+        const unTransSearchLeft1 = unTransAccountLeft1 - gap - 36;
+        
+        const targetSearchLeft = padding * (1 - progress) + unTransSearchLeft1 * progress;
+        const targetAccountLeft = (padding + currentSearchW + gap) * (1 - progress) + unTransAccountLeft1 * progress;
+        
+        searchContainer.style.transform = `translateY(-50%) translateX(${targetSearchLeft}px)`;
+        accountContainer.style.transform = `translateY(-50%) translateX(${targetAccountLeft}px)`;
+    } else {
+        if (searchContainer) {
+            searchContainer.style.width = '';
+            searchContainer.style.transform = '';
+            searchContainer.style.position = '';
+            searchContainer.style.left = '';
+            searchContainer.style.top = '';
+        }
+        if (mobileSearchInput) {
+            mobileSearchInput.style.opacity = '';
+        }
+        if (accountContainer) {
+            accountContainer.style.transform = '';
+            accountContainer.style.position = '';
+            accountContainer.style.left = '';
+            accountContainer.style.top = '';
+        }
+        if (mobileProfileLabel) {
+            mobileProfileLabel.style.opacity = '';
+            mobileProfileLabel.style.maxWidth = '';
+        }
+    }
+
+    // Desvanecer texto gigante del hero hacia afuera (fade-out) y desplazarlo hacia arriba
+    if (heroBrandingText) {
+        heroBrandingText.style.opacity = 1 - progress;
+        heroBrandingText.style.transform = `translateY(${-50 * progress}px)`;
+    }
+
+    // Desplazar párrafo descriptivo hacia arriba para ocupar el lugar reajustado
+    if (descText) {
+        const maxTranslateY = window.innerWidth < 768 ? -80 : -130;
+        const currentTranslateY = maxTranslateY * progress;
+        descText.style.transform = `translateY(${currentTranslateY}px)`;
+    }
+
+    // Manejar color de fondo y bordes del header
+    if (header) {
+        if (progress < 0.1) {
+            header.classList.remove('bg-white/80', 'backdrop-blur-xl', 'border-gray-50', 'shadow-sm');
+            header.classList.add('bg-transparent', 'border-transparent');
+        } else {
+            header.classList.remove('bg-transparent', 'border-transparent');
+            header.classList.add('bg-white/80', 'backdrop-blur-xl', 'border-gray-50', 'shadow-sm');
+        }
+    }
+}
+
+window.handleMobileSearchClick = (e) => {
+    const container = document.getElementById('mobile-header-search-container');
+    if (container && container.style.width === '36px') {
+        // Scrolled down, let's scroll to top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        const input = document.getElementById('mobile-search-input-header');
+        if (input) {
+            setTimeout(() => input.focus(), 300);
+        }
+    }
+};
+
+// Escuchadores de eventos para la animación del logo
+window.addEventListener('scroll', updateLogoTransition, { passive: true });
+window.addEventListener('resize', updateLogoTransition, { passive: true });
 
 window.navigate = (view, id = null) => {
     if (history.state) {
@@ -928,9 +1247,10 @@ window.filterCategory = (id) => {
     }
 
     state.selectedCategory = id;
+    state.view = 'catalog';
     
     const params = new URLSearchParams();
-    params.set('view', 'home');
+    params.set('view', 'catalog');
     if (id !== 'todas') {
         params.set('category', id);
     }
@@ -940,7 +1260,7 @@ window.filterCategory = (id) => {
 
     const newUrl = `${window.location.pathname}?${params.toString()}`;
     history.pushState({
-        view: 'home',
+        view: 'catalog',
         selectedCategory: id,
         productId: null,
         searchQuery: state.searchQuery,
@@ -970,6 +1290,10 @@ window.handleSearch = (query) => {
     const params = new URLSearchParams(window.location.search);
     if (query) {
         params.set('search', query);
+        if (state.view === 'home') {
+            state.view = 'catalog';
+            params.set('view', 'catalog');
+        }
     } else {
         params.delete('search');
     }
@@ -977,11 +1301,13 @@ window.handleSearch = (query) => {
     
     history.replaceState({
         ...history.state,
+        view: state.view,
         searchQuery: query,
         scrollY: window.scrollY
     }, "", newUrl);
 
     render();
+    updateHeaderUI();
 };
 
 window.toggleMobileSearch = () => {
@@ -1065,14 +1391,39 @@ function render() {
     if(!main) return;
     main.innerHTML = '';
     
-    // Ocultar buscador móvil en vistas secundarias
+    // Limpiar intervalos de los carruseles al salir de Inicio
+    if (state.view !== 'home') {
+        if (window.randomCatCarouselInterval) {
+            clearInterval(window.randomCatCarouselInterval);
+            window.randomCatCarouselInterval = null;
+        }
+        if (window.spotlightCarouselInterval) {
+            clearInterval(window.spotlightCarouselInterval);
+            window.spotlightCarouselInterval = null;
+        }
+    }
+    
+    // Ocultar buscador móvil en vistas secundarias (que no sean home o catalog)
     const mobileSearchBar = document.getElementById('mobile-search-bar');
-    if (mobileSearchBar && state.view !== 'home') {
-        mobileSearchBar.classList.add('hidden');
+    if (mobileSearchBar) {
+        if (state.view === 'home' || state.view === 'catalog') {
+            // No hacer nada, dejar que mantenga su estado visible/oculto
+        } else {
+            mobileSearchBar.classList.add('hidden');
+        }
     }
 
     if (state.view === 'home') {
+        renderHero(main);
         renderStories(main);
+        renderBenefits(main);
+        renderRandomProductSpotlight(main);
+        renderHowItWorks(main);
+        renderRandomCategoryCarousel(main);
+        renderTestimonials(main);
+        renderFAQ(main);
+        initParallaxScroll();
+    } else if (state.view === 'catalog') {
         renderSubmenu(main);
         renderCatalog(main);
     } else if (state.view === 'detail') {
@@ -1086,7 +1437,472 @@ function render() {
     }
 }
 
+// --- UTILIDADES ---
+// Función auxiliar para extraer características de la descripción del producto
+window.getProductFeatures = function(p) {
+    if (!p.description) return [];
+    let items = [];
+    if (p.description.includes('✓')) {
+        items = p.description.split('✓').map(s => s.trim());
+    } else if (p.description.includes('\n')) {
+        items = p.description.split('\n').map(s => s.trim());
+    } else if (p.description.includes('-')) {
+        items = p.description.split('-').map(s => s.trim());
+    } else {
+        items = p.description.split('.').map(s => s.trim());
+    }
+    return items.filter(s => s.length > 5 && !s.toLowerCase().includes('http')).slice(0, 3);
+};
+
+function initRevealAnimations() {
+    setTimeout(function() {
+        var selectors = '.reveal-up, .reveal-left, .reveal-right, .reveal-scale, .reveal-up-d1, .reveal-up-d2, .reveal-up-d3, .reveal-up-d4';
+        var elements = document.querySelectorAll(selectors);
+        
+        if ('IntersectionObserver' in window) {
+            var observer = new IntersectionObserver(function(entries) {
+                for (var i = 0; i < entries.length; i++) {
+                    if (entries[i].isIntersecting) {
+                        entries[i].target.classList.add('active');
+                    }
+                }
+            }, { threshold: 0.05 });
+            
+            for (var i = 0; i < elements.length; i++) {
+                observer.observe(elements[i]);
+            }
+        } else {
+            // Fallback: just show everything
+            for (var i = 0; i < elements.length; i++) {
+                elements[i].classList.add('active');
+            }
+        }
+    }, 100);
+}
+
+// Parallax scroll effect for floating elements
+function initParallaxScroll() {
+    var floatElements = document.querySelectorAll('.parallax-float');
+    if (floatElements.length === 0) return;
+    
+    function onScroll() {
+        var scrollY = window.pageYOffset || document.documentElement.scrollTop;
+        for (var i = 0; i < floatElements.length; i++) {
+            var el = floatElements[i];
+            var speed = parseFloat(el.getAttribute('data-speed')) || 0.05;
+            var rect = el.getBoundingClientRect();
+            var offset = (rect.top + rect.height / 2 - window.innerHeight / 2) * speed;
+            el.style.transform = 'translateY(' + offset + 'px)';
+        }
+    }
+    
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+}
+
+// FAQ toggle
+window.toggleFaq = function(el) {
+    el.classList.toggle('open');
+};
+
 // --- VISTAS ESPECÍFICAS ---
+function renderHero(container) {
+    // Obtener imágenes aleatorias de los productos para el carrusel
+    let heroImages = [];
+    if (state.products && state.products.length > 0) {
+        // Tomar hasta 5 productos al azar y obtener su primera imagen
+        const shuffled = [...state.products].sort(() => 0.5 - Math.random());
+        heroImages = shuffled.slice(0, 5).map(p => p.images ? p.images[0] : null).filter(img => img);
+    }
+    // Fallback images if no products
+    if (heroImages.length === 0) {
+        heroImages = [
+            "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=800",
+            "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=800"
+        ];
+    }
+
+    const heroDiv = document.createElement('div');
+    heroDiv.className = "max-w-7xl mx-auto px-6 pt-4 lg:pt-0 pb-6 animate-fade";
+    heroDiv.innerHTML = `
+        <div class="flex flex-col lg:flex-row gap-8 items-start lg:items-center justify-between mb-12">
+            
+            <!-- Columna Izquierda: Texto y Botones -->
+            <div class="w-full lg:w-1/2 flex flex-col items-start text-left reveal-up lg:-mt-12">
+                
+                <div class="inline-flex items-center gap-2 px-4 py-2 bg-gray-50 rounded-full border border-gray-100 shadow-sm mb-8 animate-float self-start">
+                    <span class="text-[10px] md:text-xs">✨</span>
+                    <span class="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-gray-500">Tecnología que transforma tu día a día</span>
+                </div>
+
+                <!-- Texto de branding gigante del Hero con animación typewriter -->
+                <div id="hero-branding-text" class="mb-6 flex flex-col leading-[0.95] select-none transition-all duration-75 ease-out w-full items-start">
+                    <!-- Contenedor para PC: EMMA Store (Emma en Extrabold, Store en Light) -->
+                    <div class="hidden md:flex flex-col items-start">
+                        <span class="text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-black cinematic-text w-fit leading-none py-1">
+                            <span class="font-extrabold tracking-tighter uppercase">EMMA</span>
+                            <span class="font-light tracking-tight ml-2 uppercase">Store</span>
+                        </span>
+                        <span class="text-[12px] sm:text-[16px] md:text-[20px] font-bold uppercase tracking-widest opacity-40 mt-3 cinematic-subtext">Bolivia</span>
+                    </div>
+                    <!-- Contenedor para Móvil: Logo a la izquierda, textos a la derecha -->
+                    <div class="flex items-center gap-5 md:hidden justify-start w-full">
+                        <!-- Logo con doble animación: entrada cinemática + flotación -->
+                        <div class="cinematic-logo-mobile flex-shrink-0">
+                            <span id="hero-logo-img-mobile" class="w-24 h-24 rounded-full overflow-hidden flex items-center justify-center text-white emma-floating-logo hero-logo-glow">
+                                <img src="assets/logo.png" alt="Logo Emma Store" class="w-full h-full object-cover rounded-full">
+                            </span>
+                        </div>
+                        <!-- Stack de textos -->
+                        <div class="flex flex-col items-start leading-[0.95] text-left">
+                            <span class="text-5xl font-extrabold uppercase tracking-tighter text-black cinematic-text-m1 w-fit">EMMA</span>
+                            <span class="text-3xl font-light uppercase tracking-[0.15em] text-black mt-1 cinematic-text-m2 w-fit">Store</span>
+                            <span class="text-[10px] font-bold uppercase tracking-[0.25em] opacity-40 mt-2 cinematic-text-m3 w-fit">Bolivia</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- A medida que sube, el texto descriptivo se va acomodando en lugar del título -->
+                <p id="hero-desc-text" class="text-xs sm:text-sm md:text-base text-gray-500 font-medium leading-relaxed mb-8 max-w-lg text-left transition-transform duration-75 ease-out">
+                    Explora nuestro catálogo exclusivo, arma tu carrito y coordina la entrega de forma rápida y segura sin salir de casa. Directo a tu WhatsApp.
+                </p>
+                
+                <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                    <button onclick="window.navigate('catalog')" class="btn-premium pulse-green bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl active:scale-95 flex items-center justify-center gap-3 w-full sm:w-auto">
+                        <i class="fa-solid fa-bag-shopping"></i> Ver Catálogo Completo <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Columna Derecha: Imagen Dinámica -->
+            <div class="w-full lg:w-1/2 h-[300px] sm:h-[400px] lg:h-[500px] reveal-up" style="transition-delay: 0.2s">
+                <div class="hero-image-container shadow-2xl glass-effect p-2">
+                    <div class="w-full h-full rounded-2xl overflow-hidden relative" id="hero-image-slider">
+                        ${heroImages.map((img, i) => `
+                            <img src="${img}" class="hero-image ${i === 0 ? 'active' : ''}" alt="Tech Image ${i}">
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- Barra Inferior de Beneficios -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-8 reveal-up" style="transition-delay: 0.4s">
+            <div class="glass-effect rounded-2xl p-6 flex items-center gap-4 transition-transform hover:-translate-y-1">
+                <div class="w-12 h-12 rounded-full bg-orange-50 flex items-center justify-center text-orange-500 text-xl flex-shrink-0">
+                    <i class="fa-solid fa-bolt"></i>
+                </div>
+                <div>
+                    <h4 class="text-xs font-black uppercase tracking-wider text-black">Envío súper veloz en el día</h4>
+                    <p class="text-[10px] text-gray-400 font-bold mt-1">Recibe tus compras en tiempo récord.</p>
+                </div>
+            </div>
+            <div class="glass-effect rounded-2xl p-6 flex items-center gap-4 transition-transform hover:-translate-y-1">
+                <div class="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 text-xl flex-shrink-0">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <div>
+                    <h4 class="text-xs font-black uppercase tracking-wider text-black">Pagos seguros contra entrega</h4>
+                    <p class="text-[10px] text-gray-400 font-bold mt-1">Paga al recibir tu pedido en la puerta de tu casa.</p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    container.appendChild(heroDiv);
+
+    // Activar animaciones reveal del Hero
+    initRevealAnimations();
+
+    // Inicializar carrusel del hero si hay más de 1 imagen
+    if (heroImages.length > 1) {
+        let currentImg = 0;
+        const images = heroDiv.querySelectorAll('.hero-image');
+        clearInterval(window.heroSliderInterval);
+        window.heroSliderInterval = setInterval(() => {
+            if (!document.getElementById('hero-image-slider')) {
+                clearInterval(window.heroSliderInterval);
+                return;
+            }
+            images[currentImg].classList.remove('active');
+            currentImg = (currentImg + 1) % images.length;
+            images[currentImg].classList.add('active');
+        }, 5000);
+    }
+}
+
+// --- VISTAS ESPECÍFICAS ---
+
+// ===== SECCIÓN: BENEFICIOS DE COMPRAR EN EMMA STORE =====
+function renderBenefits(container) {
+    var div = document.createElement('div');
+    div.className = 'section-divider py-16 md:py-24';
+    div.innerHTML = `
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-12 md:mb-16">
+                <p class="text-[10px] md:text-xs font-black uppercase tracking-[0.4em] text-gray-400 mb-3 reveal-up">¿Por qué elegirnos?</p>
+                <h2 class="text-2xl sm:text-3xl md:text-5xl font-black uppercase tracking-tighter text-black leading-[0.95] reveal-up text-shimmer">
+                    Beneficios de comprar<br>en Emma Store
+                </h2>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="benefit-card reveal-up-d1">
+                    <div class="benefit-icon bg-green-50 text-green-500">
+                        <i class="fa-brands fa-whatsapp"></i>
+                    </div>
+                    <h4 class="text-xs font-black uppercase tracking-wider text-black mb-2">Atención Personalizada</h4>
+                    <p class="text-[11px] text-gray-500 leading-relaxed font-medium">Haz tu pedido y coordina directamente con un asesor por WhatsApp. Respuesta rápida garantizada.</p>
+                </div>
+                
+                <div class="benefit-card reveal-up-d2">
+                    <div class="benefit-icon bg-blue-50 text-blue-500">
+                        <i class="fa-solid fa-truck-fast"></i>
+                    </div>
+                    <h4 class="text-xs font-black uppercase tracking-wider text-black mb-2">Envíos Rápidos y Seguros</h4>
+                    <p class="text-[11px] text-gray-500 leading-relaxed font-medium">Envíos garantizados hasta la puerta de tu casa o punto de entrega en todo Bolivia.</p>
+                </div>
+                
+                <div class="benefit-card reveal-up-d3">
+                    <div class="benefit-icon bg-purple-50 text-purple-500">
+                        <i class="fa-solid fa-hand-holding-heart"></i>
+                    </div>
+                    <h4 class="text-xs font-black uppercase tracking-wider text-black mb-2">Sin Complicaciones</h4>
+                    <p class="text-[11px] text-gray-500 leading-relaxed font-medium">Sin registros aburridos ni tarjetas obligatorias. Eliges, pides y coordinas el pago como prefieras.</p>
+                </div>
+                
+                <div class="benefit-card reveal-up-d4">
+                    <div class="benefit-icon bg-orange-50 text-orange-500">
+                        <i class="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <h4 class="text-xs font-black uppercase tracking-wider text-black mb-2">Garantía de Satisfacción</h4>
+                    <p class="text-[11px] text-gray-500 leading-relaxed font-medium">Si tu producto tiene fallas de fábrica, gestionamos el cambio inmediato. Tu confianza es nuestra prioridad.</p>
+                </div>
+            </div>
+            
+            <!-- Logo flotante decorativo -->
+            <div class="flex justify-center mt-12 md:mt-16">
+                <div class="emma-floating-logo parallax-float" data-speed="0.08">
+                    <div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl overflow-hidden bg-white border border-gray-100 shadow-lg p-2">
+                        <img src="assets/logo.png" alt="Emma Store" class="w-full h-full object-contain">
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(div);
+    initRevealAnimations();
+}
+
+// ===== SECCIÓN: CÓMO FUNCIONA EL PEDIDO =====
+function renderHowItWorks(container) {
+    var div = document.createElement('div');
+    div.className = 'section-divider py-16 md:py-24';
+    div.innerHTML = `
+        <div class="max-w-5xl mx-auto px-6">
+            <div class="text-center mb-14 md:mb-20">
+                <p class="text-[10px] md:text-xs font-black uppercase tracking-[0.4em] text-gray-400 mb-3 reveal-up">Súper fácil</p>
+                <h2 class="text-2xl sm:text-3xl md:text-5xl font-black uppercase tracking-tighter text-black leading-[0.95] reveal-up text-shimmer">
+                    ¿Cómo hacer tu pedido?
+                </h2>
+                <p class="text-sm text-gray-500 font-medium mt-4 max-w-lg mx-auto reveal-up">En 3 simples pasos recibes tu producto en la puerta de tu casa</p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-10 md:gap-16 relative">
+                <div class="step-card text-center reveal-up-d1">
+                    <div class="step-number">1</div>
+                    <div class="w-14 h-14 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center text-2xl mx-auto mb-5">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                    </div>
+                    <h4 class="text-sm font-black uppercase tracking-wider text-black mb-2">Arma tu Carrito</h4>
+                    <p class="text-[11px] text-gray-500 leading-relaxed font-medium">Explora nuestro catálogo y elige los productos que más te gusten. Añádelos a tu bolsa con un solo clic.</p>
+                    <div class="step-connector"></div>
+                </div>
+                
+                <div class="step-card text-center reveal-up-d2">
+                    <div class="step-number">2</div>
+                    <div class="w-14 h-14 rounded-2xl bg-green-50 text-green-500 flex items-center justify-center text-2xl mx-auto mb-5">
+                        <i class="fa-brands fa-whatsapp"></i>
+                    </div>
+                    <h4 class="text-sm font-black uppercase tracking-wider text-black mb-2">Envía tu Pedido</h4>
+                    <p class="text-[11px] text-gray-500 leading-relaxed font-medium">Haz clic en "Enviar" y se generará un mensaje automático con tu lista directo a nuestro WhatsApp.</p>
+                    <div class="step-connector"></div>
+                </div>
+                
+                <div class="step-card text-center reveal-up-d3">
+                    <div class="step-number">3</div>
+                    <div class="w-14 h-14 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center text-2xl mx-auto mb-5">
+                        <i class="fa-solid fa-box-open"></i>
+                    </div>
+                    <h4 class="text-sm font-black uppercase tracking-wider text-black mb-2">Coordina y Recibe</h4>
+                    <p class="text-[11px] text-gray-500 leading-relaxed font-medium">Un asesor confirmará tu stock, acordarán el método de pago y programarán la entrega. ¡Así de fácil!</p>
+                </div>
+            </div>
+            
+            <!-- CTA verde llamativo -->
+            <div class="text-center mt-12 md:mt-16 reveal-scale">
+                <button onclick="window.navigate('catalog')" 
+                        class="btn-premium pulse-green bg-green-500 hover:bg-green-600 text-white px-10 py-5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl active:scale-95 inline-flex items-center gap-3 transition-all">
+                    <i class="fa-solid fa-bag-shopping"></i> Ver Catálogo Completo <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(div);
+    initRevealAnimations();
+}
+
+// ===== SECCIÓN: TESTIMONIOS / PRUEBA SOCIAL =====
+function renderTestimonials(container) {
+    var div = document.createElement('div');
+    div.className = 'py-16 md:py-24 bg-white';
+    div.innerHTML = `
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="text-center mb-12 md:mb-16">
+                <p class="text-[10px] md:text-xs font-black uppercase tracking-[0.4em] text-gray-400 mb-3 reveal-up">Prueba social</p>
+                <h2 class="text-2xl sm:text-3xl md:text-5xl font-black uppercase tracking-tighter text-black leading-[0.95] reveal-up text-shimmer">
+                    Lo que dicen<br>nuestros clientes
+                </h2>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="testimonial-card reveal-up-d1">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-pink-400 to-purple-500 flex items-center justify-center text-white text-sm font-black">M</div>
+                        <div>
+                            <p class="text-xs font-black text-black">María G.</p>
+                            <p class="text-[9px] text-gray-400 font-bold">Cochabamba</p>
+                        </div>
+                        <div class="ml-auto text-green-500"><i class="fa-brands fa-whatsapp text-lg"></i></div>
+                    </div>
+                    <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                        <p class="text-xs text-gray-600 leading-relaxed font-medium italic">"Ya me llegó el producto, excelente calidad y súper rápido el envío. La atención por WhatsApp fue increíble, me respondieron al instante. ¡100% recomendado!"</p>
+                    </div>
+                    <div class="flex gap-1 mt-3">
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                    </div>
+                </div>
+                
+                <div class="testimonial-card reveal-up-d2">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center text-white text-sm font-black">C</div>
+                        <div>
+                            <p class="text-xs font-black text-black">Carlos R.</p>
+                            <p class="text-[9px] text-gray-400 font-bold">Santa Cruz</p>
+                        </div>
+                        <div class="ml-auto text-green-500"><i class="fa-brands fa-whatsapp text-lg"></i></div>
+                    </div>
+                    <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                        <p class="text-xs text-gray-600 leading-relaxed font-medium italic">"Pedí una selladora y una plancha para ropa. Todo llegó perfecto y bien empacado. El pago contra entrega me dio mucha confianza. Volveré a comprar seguro."</p>
+                    </div>
+                    <div class="flex gap-1 mt-3">
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                    </div>
+                </div>
+                
+                <div class="testimonial-card reveal-up-d3">
+                    <div class="flex items-center gap-3 mb-4">
+                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-white text-sm font-black">L</div>
+                        <div>
+                            <p class="text-xs font-black text-black">Laura P.</p>
+                            <p class="text-[9px] text-gray-400 font-bold">La Paz</p>
+                        </div>
+                        <div class="ml-auto text-green-500"><i class="fa-brands fa-whatsapp text-lg"></i></div>
+                    </div>
+                    <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                        <p class="text-xs text-gray-600 leading-relaxed font-medium italic">"Me encanta que no hay que registrarse ni poner tarjetas. Simplemente eliges, mandas por WhatsApp y listo. Los productos son de muy buena calidad para el precio."</p>
+                    </div>
+                    <div class="flex gap-1 mt-3">
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-solid fa-star text-yellow-400 text-xs"></i>
+                        <i class="fa-regular fa-star text-yellow-400 text-xs"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Garantía -->
+            <div class="mt-12 md:mt-16 reveal-scale">
+                <div class="bg-black rounded-[2rem] p-8 md:p-12 flex flex-col md:flex-row items-center gap-6 md:gap-10 text-center md:text-left">
+                    <div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-white/10 flex items-center justify-center text-3xl md:text-4xl flex-shrink-0">
+                        🛡️
+                    </div>
+                    <div class="flex-1">
+                        <h4 class="text-white text-sm md:text-base font-black uppercase tracking-wider mb-2">Garantía de Satisfacción Emma Store</h4>
+                        <p class="text-white/60 text-xs md:text-sm font-medium leading-relaxed">Si tu producto presenta fallas de fábrica, gestionamos el cambio inmediato sin costo adicional. Tu confianza y satisfacción son lo más importante para nosotros.</p>
+                    </div>
+                    <button onclick="window.open('https://wa.me/59178986924?text=Hola%20Emma%20Store,%20tengo%20una%20consulta%20sobre%20la%20garant%C3%ADa', '_blank')" 
+                            class="btn-premium bg-white text-black px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 active:scale-95 flex-shrink-0 transition-all">
+                        Consultar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(div);
+    initRevealAnimations();
+}
+
+// ===== SECCIÓN: PREGUNTAS FRECUENTES =====
+function renderFAQ(container) {
+    var faqs = [
+        { q: '¿Tienen tienda física o solo virtual?', a: 'Emma Store es una tienda 100% virtual. Operamos a través de nuestro catálogo en línea y coordinamos todos los pedidos por WhatsApp para brindarte la mejor atención personalizada desde la comodidad de tu hogar.' },
+        { q: '¿Cuáles son los métodos de pago?', a: 'Aceptamos efectivo contra entrega, transferencia bancaria, pagos por QR (Tigo Money, etc.). ¡Tú eliges cómo pagar! No necesitas tarjeta de crédito ni débito obligatoriamente.' },
+        { q: '¿Cuánto tarda en llegar mi pedido?', a: 'En la ciudad de origen, los envíos se realizan el mismo día o al día siguiente. Para otras ciudades de Bolivia, el tiempo estimado es de 2 a 5 días hábiles dependiendo de la ubicación.' },
+        { q: '¿Hacen envíos a todo Bolivia?', a: '¡Sí! Realizamos envíos a todos los departamentos de Bolivia. Cochabamba, Santa Cruz, La Paz, Sucre, Oruro, Potosí, Tarija, Beni y Pando. Coordinamos la logística para que tu pedido llegue seguro.' },
+        { q: '¿Qué pasa si mi producto llega con defectos?', a: 'Contamos con garantía de satisfacción. Si tu producto presenta fallas de fábrica, contáctanos por WhatsApp y gestionaremos el cambio inmediato sin costo adicional para ti.' },
+        { q: '¿Puedo ver los productos antes de comprar?', a: 'Todos nuestros productos cuentan con fotos reales y detalladas en el catálogo. Además, puedes solicitar fotos o videos adicionales por WhatsApp antes de confirmar tu pedido.' }
+    ];
+    
+    var div = document.createElement('div');
+    div.className = 'section-divider py-16 md:py-24';
+    div.innerHTML = `
+        <div class="max-w-3xl mx-auto px-6">
+            <div class="text-center mb-12 md:mb-16">
+                <p class="text-[10px] md:text-xs font-black uppercase tracking-[0.4em] text-gray-400 mb-3 reveal-up">Resolvemos tus dudas</p>
+                <h2 class="text-2xl sm:text-3xl md:text-5xl font-black uppercase tracking-tighter text-black leading-[0.95] reveal-up text-shimmer">
+                    Preguntas Frecuentes
+                </h2>
+            </div>
+            
+            <div class="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden reveal-up">
+                ${faqs.map(function(faq, i) {
+                    return '<div class="faq-item px-6 md:px-8 py-5" onclick="window.toggleFaq(this)">' +
+                        '<div class="flex items-center justify-between gap-4">' +
+                            '<h4 class="text-xs md:text-sm font-black text-black uppercase tracking-wider">' + faq.q + '</h4>' +
+                            '<i class="fa-solid fa-chevron-down faq-chevron text-xs text-gray-400 flex-shrink-0"></i>' +
+                        '</div>' +
+                        '<div class="faq-answer">' +
+                            '<p class="text-xs text-gray-500 leading-relaxed font-medium">' + faq.a + '</p>' +
+                        '</div>' +
+                    '</div>';
+                }).join('')}
+            </div>
+            
+            <!-- CTA final -->
+            <div class="text-center mt-10 md:mt-14 reveal-up">
+                <p class="text-xs text-gray-500 font-medium mb-4">¿Tienes otra pregunta? ¡Escríbenos!</p>
+                <button onclick="window.open('https://wa.me/59178986924?text=Hola%20Emma%20Store,%20tengo%20una%20consulta', '_blank')" 
+                        class="btn-premium pulse-green bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:shadow-2xl active:scale-95 inline-flex items-center gap-3 transition-all">
+                    <i class="fa-brands fa-whatsapp text-lg"></i> Escribir por WhatsApp
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(div);
+    initRevealAnimations();
+}
+
 function renderStories(container) {
     const div = document.createElement('div');
     div.className = "max-w-7xl mx-auto px-6 py-6 flex gap-6 overflow-x-auto no-scrollbar animate-fade overscroll-x-contain scroll-smooth";
@@ -1099,6 +1915,291 @@ function renderStories(container) {
         </div>
     `).join('');
     if (state.stories.length > 0) container.appendChild(div);
+}
+
+function renderRandomCategoryCarousel(container) {
+    if (!state.randomCategoryId) return;
+    const catProducts = state.products.filter(p => p.categoryId == state.randomCategoryId);
+    if (catProducts.length === 0) return;
+
+    if (window.randomCatCarouselInterval) {
+        clearInterval(window.randomCatCarouselInterval);
+        window.randomCatCarouselInterval = null;
+    }
+
+    const section = document.createElement('div');
+    section.className = "max-w-7xl mx-auto px-6 py-12 md:py-16 animate-fade reveal-up";
+    section.innerHTML = `
+        <div class="category-carousel-section rounded-[2.5rem] md:rounded-[3.5rem] p-6 md:p-10 relative overflow-hidden">
+            <div class="absolute -right-16 -top-16 w-64 h-64 bg-gray-100/50 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+                <div>
+                    <span class="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-black text-white rounded-full text-[8px] font-black uppercase tracking-[0.2em] mb-3">
+                        <span class="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse"></span>
+                        Categoría: ${state.randomCategoryName}
+                    </span>
+                    <h2 class="text-xl md:text-3xl font-black uppercase text-black tracking-tight">Colección Destacada</h2>
+                    <p class="text-[10px] md:text-xs text-gray-400 font-bold mt-1">Nuestra mejor selección de esta categoría para ti.</p>
+                </div>
+                <button onclick="window.filterCategory(${state.randomCategoryId})" class="text-[9px] font-black uppercase tracking-widest text-white bg-black hover:bg-gray-900 rounded-2xl px-6 py-3.5 transition-all select-none active:scale-95 cursor-pointer shadow-md">
+                    Ver Colección
+                </button>
+            </div>
+            
+            <div class="relative group/slider">
+                <!-- Flecha de navegación Izquierda -->
+                <button id="random-cat-prev-btn" class="absolute left-2 md:-left-5 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full flex items-center justify-center text-black carousel-nav-btn select-none cursor-pointer hover:shadow-lg transition-all duration-300">
+                    <i class="fa-solid fa-chevron-left text-xs"></i>
+                </button>
+                
+                <!-- Lista de productos scrollable y snapable -->
+                <div class="flex gap-4 md:gap-6 overflow-x-auto no-scrollbar pb-3 overscroll-x-contain scroll-smooth snap-x snap-mandatory" id="random-cat-carousel-list">
+                    ${catProducts.map(p => {
+                        const isOutOfStock = p.inStock === false;
+                        return `
+                            <div class="w-36 md:w-52 flex-shrink-0 flex flex-col justify-between group relative bg-white border border-gray-100 p-3 rounded-2xl md:rounded-[1.75rem] transition-all duration-300 hover:shadow-xl hover:border-gray-200 hover:-translate-y-1 cursor-pointer snap-start" onclick="window.navigate('detail', ${p.id})">
+                                <div class="aspect-[3/4] overflow-hidden bg-gray-50 rounded-xl md:rounded-[1.25rem] relative mb-3">
+                                    <img src="${p.images && p.images.length ? p.images[0] : ''}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                                    ${isOutOfStock ? `
+                                        <div class="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-[6px] font-black uppercase tracking-wider">Agotado</div>
+                                    ` : ''}
+                                </div>
+                                <div class="px-1 text-left">
+                                    <span class="text-[8px] font-extrabold uppercase tracking-wider text-gray-400 block mb-1">${state.randomCategoryName}</span>
+                                    <h4 class="text-[10px] md:text-xs font-black uppercase text-black line-clamp-1 leading-tight mb-1 group-hover:text-gray-600 transition-colors">${p.name}</h4>
+                                    <div class="flex justify-between items-center mt-2">
+                                        <span class="text-[10px] md:text-xs font-black text-black">BS ${p.price}</span>
+                                        ${!isOutOfStock ? `
+                                            <button onclick="event.stopPropagation(); addToCart(${p.id})" class="p-2 bg-black hover:bg-gray-800 text-white rounded-lg flex items-center justify-center transition-all active:scale-90 shadow-sm border-none cursor-pointer">
+                                                <i class="fa-solid fa-plus text-[8px]"></i>
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+
+                <!-- Flecha de navegación Derecha -->
+                <button id="random-cat-next-btn" class="absolute right-2 md:-right-5 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full flex items-center justify-center text-black carousel-nav-btn select-none cursor-pointer hover:shadow-lg transition-all duration-300">
+                    <i class="fa-solid fa-chevron-right text-xs"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    container.appendChild(section);
+
+    // Inicializar listeners del slider
+    const list = section.querySelector('#random-cat-carousel-list');
+    const prevBtn = section.querySelector('#random-cat-prev-btn');
+    const nextBtn = section.querySelector('#random-cat-next-btn');
+
+    if (list && prevBtn && nextBtn) {
+        let userInteracted = false;
+
+        const stopAutoScroll = () => {
+            if (userInteracted) return;
+            userInteracted = true;
+            if (window.randomCatCarouselInterval) {
+                clearInterval(window.randomCatCarouselInterval);
+                window.randomCatCarouselInterval = null;
+            }
+        };
+
+        // Detener auto-scroll permanentemente en cualquier interacción manual
+        list.addEventListener('pointerdown', stopAutoScroll, { passive: true });
+        list.addEventListener('wheel', stopAutoScroll, { passive: true });
+
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            stopAutoScroll();
+            const scrollAmount = list.clientWidth * 0.75;
+            list.scrollBy({ left: -scrollAmount, behavior: 'smooth' });
+        });
+
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            stopAutoScroll();
+            const scrollAmount = list.clientWidth * 0.75;
+            list.scrollBy({ left: scrollAmount, behavior: 'smooth' });
+        });
+
+        // Auto-desplazamiento automático cada 5 segundos
+        window.randomCatCarouselInterval = setInterval(() => {
+            // Validar que el elemento aún exista en el DOM
+            if (!document.getElementById('random-cat-carousel-list')) {
+                clearInterval(window.randomCatCarouselInterval);
+                window.randomCatCarouselInterval = null;
+                return;
+            }
+
+            const maxScroll = list.scrollWidth - list.clientWidth;
+            if (list.scrollLeft >= maxScroll - 10) {
+                // Volver al principio
+                list.scrollTo({ left: 0, behavior: 'smooth' });
+            } else {
+                // Desplazarse a la derecha
+                list.scrollBy({ left: list.clientWidth * 0.75, behavior: 'smooth' });
+            }
+        }, 5000);
+    }
+}
+
+function renderRandomProductSpotlight(container) {
+    const products = state.spotlightProducts || state.products.slice(0, 5);
+    if (!products || products.length === 0) return;
+
+    if (window.spotlightCarouselInterval) {
+        clearInterval(window.spotlightCarouselInterval);
+        window.spotlightCarouselInterval = null;
+    }
+
+    const section = document.createElement('div');
+    section.className = "max-w-7xl mx-auto px-6 py-12 md:py-16 animate-fade reveal-up relative group/spotlight";
+    
+    section.innerHTML = `
+        <!-- Flecha de navegación Izquierda -->
+        <button id="spotlight-prev-btn" class="absolute left-2 md:-left-5 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-white/10 border border-white/10 shadow-lg flex items-center justify-center text-white opacity-85 hover:opacity-100 hover:bg-white/20 active:scale-95 transition-all duration-300 cursor-pointer">
+            <i class="fa-solid fa-chevron-left text-xs"></i>
+        </button>
+
+        <!-- Contenedor Deslizable Principal -->
+        <div class="flex overflow-x-auto no-scrollbar pb-1 overscroll-x-contain scroll-smooth snap-x snap-mandatory rounded-[2.5rem] md:rounded-[3.5rem]" id="spotlight-carousel-list">
+            ${products.map(p => {
+                const cat = state.categories.find(c => c.id == p.categoryId);
+                const categoryLabel = cat ? cat.name.toUpperCase() : 'NUEVO';
+                const isOutOfStock = p.inStock === false;
+                const features = window.getProductFeatures(p);
+
+                return `
+                    <div class="w-full flex-shrink-0 snap-start bg-black text-white relative overflow-hidden emma-floating-slide">
+                        <div class="absolute -left-20 -bottom-20 w-80 h-80 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
+                        
+                        <div class="flex flex-col lg:flex-row gap-6 lg:gap-12 items-center justify-center p-8 md:p-14">
+                            
+                            <!-- Columna Izquierda: Información del producto -->
+                            <div class="w-full lg:w-[55%] flex flex-col items-center lg:items-start text-center lg:text-left order-2 lg:order-1 relative z-10">
+                                <div class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 rounded-full border border-white/10 mb-6">
+                                    <span class="text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] text-white/80">★ Recomendado de la Semana</span>
+                                </div>
+                                
+                                <span class="text-[8px] md:text-[10px] font-black tracking-widest text-white/40 uppercase mb-2">${categoryLabel}</span>
+                                <h3 class="text-2xl sm:text-3xl md:text-5xl font-black uppercase tracking-tighter text-white leading-[0.95] mb-6">
+                                    ${p.name}
+                                </h3>
+                                
+                                <!-- Lista de características con checkmarks -->
+                                <div class="space-y-3 mb-8 text-left w-full">
+                                    ${features.length > 0 ? features.map(f => `
+                                        <div class="text-xs md:text-sm text-white/80 flex items-start gap-2.5 font-medium leading-relaxed">
+                                            <i class="fa-solid fa-circle-check text-green-400 text-sm mt-0.5 flex-shrink-0"></i>
+                                            <span>${f}</span>
+                                        </div>
+                                    `).join('') : `
+                                        <div class="text-xs md:text-sm text-white/80 flex items-start gap-2.5 font-medium leading-relaxed">
+                                            <i class="fa-solid fa-circle-check text-green-400 text-sm mt-0.5 flex-shrink-0"></i>
+                                            <span>Garantía oficial y envío delivery a domicilio</span>
+                                        </div>
+                                        <div class="text-xs md:text-sm text-white/80 flex items-start gap-2.5 font-medium leading-relaxed">
+                                            <i class="fa-solid fa-circle-check text-green-400 text-sm mt-0.5 flex-shrink-0"></i>
+                                            <span>Calidad superior certificada de Emma Store</span>
+                                        </div>
+                                    `}
+                                </div>
+                                
+                                <div class="text-2xl md:text-3xl font-black tracking-tight text-white mb-8">
+                                    BS ${p.price}
+                                </div>
+                                
+                                <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                                    ${isOutOfStock ? `
+                                        <button disabled class="w-full sm:w-auto bg-white/10 text-white/40 border border-white/10 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed select-none">
+                                            Agotado temporalmente
+                                        </button>
+                                    ` : `
+                                        <button onclick="addToCart(${p.id})" class="btn-premium bg-white text-black px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 active:scale-95 transition-all flex items-center justify-center gap-3 w-full sm:w-auto shadow-xl border-none cursor-pointer">
+                                            <i class="fa-solid fa-plus text-xs"></i> Añadir a la bolsa
+                                        </button>
+                                    `}
+                                    <button onclick="window.navigate('detail', ${p.id})" class="w-full sm:w-auto bg-transparent text-white border border-white/20 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                                        Ver detalles
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Columna Derecha: Imagen del producto -->
+                            <div class="w-full lg:w-[35%] flex items-center justify-center order-1 lg:order-2 relative z-10">
+                                <div class="relative w-48 h-48 sm:w-56 sm:h-56 lg:w-72 lg:h-72 rounded-2xl overflow-hidden bg-white/5 border border-white/10 p-2 shadow-2xl hover:scale-[1.02] transition-transform duration-500">
+                                    <img src="${p.images && p.images.length ? p.images[0] : ''}" class="w-full h-full object-cover rounded-xl">
+                                </div>
+                            </div>
+                            
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+
+        <!-- Flecha de navegación Derecha -->
+        <button id="spotlight-next-btn" class="absolute right-2 md:-right-5 top-1/2 -translate-y-1/2 z-10 w-11 h-11 rounded-full bg-white/10 border border-white/10 shadow-lg flex items-center justify-center text-white opacity-85 hover:opacity-100 hover:bg-white/20 active:scale-95 transition-all duration-300 cursor-pointer">
+            <i class="fa-solid fa-chevron-right text-xs"></i>
+        </button>
+    `;
+    container.appendChild(section);
+
+    // Inicializar listeners del slider de spotlight
+    const list = section.querySelector('#spotlight-carousel-list');
+    const prevBtn = section.querySelector('#spotlight-prev-btn');
+    const nextBtn = section.querySelector('#spotlight-next-btn');
+
+    if (list && prevBtn && nextBtn) {
+        let userInteracted = false;
+
+        const stopAutoScroll = () => {
+            if (userInteracted) return;
+            userInteracted = true;
+            if (window.spotlightCarouselInterval) {
+                clearInterval(window.spotlightCarouselInterval);
+                window.spotlightCarouselInterval = null;
+            }
+        };
+
+        // Detener auto-scroll permanentemente en cualquier interacción manual
+        list.addEventListener('pointerdown', stopAutoScroll, { passive: true });
+        list.addEventListener('wheel', stopAutoScroll, { passive: true });
+
+        prevBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            stopAutoScroll();
+            list.scrollBy({ left: -list.clientWidth, behavior: 'smooth' });
+        });
+
+        nextBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            stopAutoScroll();
+            list.scrollBy({ left: list.clientWidth, behavior: 'smooth' });
+        });
+
+        // Auto-desplazamiento automático cada 5 segundos
+        window.spotlightCarouselInterval = setInterval(() => {
+            if (!document.getElementById('spotlight-carousel-list')) {
+                clearInterval(window.spotlightCarouselInterval);
+                window.spotlightCarouselInterval = null;
+                return;
+            }
+
+            const maxScroll = list.scrollWidth - list.clientWidth;
+            if (list.scrollLeft >= maxScroll - 10) {
+                // Volver al principio
+                list.scrollTo({ left: 0, behavior: 'smooth' });
+            } else {
+                // Desplazarse a la derecha
+                list.scrollBy({ left: list.clientWidth, behavior: 'smooth' });
+            }
+        }, 5000);
+    }
 }
 
 function renderSubmenu(container) {
@@ -1161,7 +2262,7 @@ function renderCatalog(container) {
                     ${featuredCatProducts.map(p => `
                         <div class="w-32 md:w-44 flex-shrink-0 flex flex-col justify-between cursor-pointer" onclick="navigate('detail', ${p.id})">
                             <div class="aspect-[3/4] overflow-hidden bg-white rounded-2xl md:rounded-[2rem] border border-gray-100 shadow-sm relative mb-3">
-                                <img src="${p.images[0]}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
+                                <img src="${p.images && p.images.length ? p.images[0] : ''}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
                             </div>
                             <div class="px-1 text-left">
                                 <h4 class="text-[9px] md:text-xs font-black uppercase text-black line-clamp-1 leading-tight mb-1">${p.name}</h4>
@@ -1184,28 +2285,67 @@ function renderCatalog(container) {
 
         // Render as wide card if index is at the spacing interval
         if (index > 0 && index % (spacing + 1) === spacing) {
-            return `
-            <div class="product-card group relative col-span-2 lg:col-span-4 bg-gray-50/50 border border-gray-100 rounded-[2rem] md:rounded-[3rem] p-4 md:p-6 flex gap-4 md:gap-8 items-center h-auto justify-between">
-                <!-- Left Image -->
-                <div class="w-28 md:w-44 aspect-[3/4] overflow-hidden bg-white rounded-[1.5rem] md:rounded-[2rem] relative cursor-pointer shadow-sm border border-gray-100 flex-shrink-0" 
-                     onclick="navigate('detail', ${p.id})">
-                    <img src="${p.images[0]}" onload="this.classList.remove('opacity-0')" class="product-image w-full h-full object-cover transition-all duration-700 opacity-0">
+            const features = window.getProductFeatures(p);
+            const featuresHTML = features.length > 0 ? features.map(f => `
+                <div class="text-[9px] md:text-xs text-white/80 flex items-start gap-2.5 font-medium leading-relaxed">
+                    <i class="fa-solid fa-circle-check text-green-400 text-[10px] md:text-[12px] mt-0.5 flex-shrink-0"></i>
+                    <span>${f}</span>
                 </div>
-                <!-- Right Info -->
-                <div class="flex-1 flex flex-col justify-between py-1 text-left self-stretch">
-                    <div>
-                        <span class="text-[8px] font-black uppercase text-gray-400 tracking-widest">${categoryLabel}</span>
-                        <h3 class="text-xs md:text-xl font-black uppercase text-black mt-1 mb-1.5 line-clamp-2 leading-tight">${p.name}</h3>
-                        <p class="text-[9px] md:text-xs text-gray-400 font-bold line-clamp-3 mb-3 leading-relaxed">${p.description || 'Sin descripción disponible.'}</p>
-                        <span class="text-xs md:text-lg font-black text-black block mb-3">BS ${p.price}</span>
+            `).join('') : `
+                <div class="text-[9px] md:text-xs text-white/80 flex items-start gap-2.5 font-medium leading-relaxed">
+                    <i class="fa-solid fa-circle-check text-green-400 text-[10px] md:text-[12px] mt-0.5 flex-shrink-0"></i>
+                    <span>Garantía oficial y envío delivery a domicilio</span>
+                </div>
+                <div class="text-[9px] md:text-xs text-white/80 flex items-start gap-2.5 font-medium leading-relaxed">
+                    <i class="fa-solid fa-circle-check text-green-400 text-[10px] md:text-[12px] mt-0.5 flex-shrink-0"></i>
+                    <span>Calidad superior certificada de Emma Store</span>
+                </div>
+            `;
+
+            return `
+            <div class="product-card group relative col-span-2 lg:col-span-4 bg-black text-white rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 flex flex-col md:flex-row gap-6 md:gap-12 lg:gap-20 items-center justify-center overflow-hidden shadow-2xl border border-white/5 emma-floating-slide">
+                <div class="absolute -left-20 -bottom-20 w-80 h-80 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <!-- Left Content: Info -->
+                <div class="w-full md:w-[55%] flex flex-col items-center md:items-start text-center md:text-left order-2 md:order-1 relative z-10">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full border border-white/10 mb-4">
+                        <span class="text-[7px] md:text-[8px] font-black uppercase tracking-[0.2em] text-white/85">★ Recomendado de la Semana</span>
                     </div>
-                    <div class="flex flex-col sm:flex-row gap-2 mt-auto">
-                        <button onclick="addToCart(${p.id})" class="bg-black text-white px-4 py-2.5 rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-wider hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-sm border-none cursor-pointer">
-                            <i class="fa-solid fa-plus"></i> Añadir
+                    
+                    <span class="text-[8px] md:text-[9px] font-black tracking-widest text-white/40 uppercase mb-1 md:mb-2">${categoryLabel}</span>
+                    <h3 class="text-lg sm:text-xl md:text-3xl font-black uppercase tracking-tighter text-white leading-[1.05] mb-4 md:mb-5">
+                        ${p.name}
+                    </h3>
+                    
+                    <!-- Checklist -->
+                    <div class="space-y-2.5 mb-5 md:mb-6 text-left w-full">
+                        ${featuresHTML}
+                    </div>
+                    
+                    <div class="text-lg md:text-2xl font-black tracking-tight text-white mb-5 md:mb-6">
+                        BS ${p.price}
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                        ${isOutOfStock ? `
+                            <button disabled class="w-full sm:w-auto bg-white/10 text-white/40 border border-white/10 px-6 py-3.5 rounded-xl text-[9px] font-black uppercase tracking-widest cursor-not-allowed select-none">
+                                Agotado
+                            </button>
+                        ` : `
+                            <button onclick="addToCart(${p.id})" class="btn-premium bg-white text-black px-6 py-3.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-gray-100 active:scale-95 transition-all flex items-center justify-center gap-2 w-full sm:w-auto shadow-xl border-none cursor-pointer">
+                                <i class="fa-solid fa-plus text-[10px]"></i> Añadir a la bolsa
+                            </button>
+                        `}
+                        <button onclick="navigate('detail', ${p.id})" class="w-full sm:w-auto bg-transparent text-white border border-white/20 px-6 py-3.5 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-white/5 active:scale-95 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                            Ver detalles
                         </button>
-                        <button onclick="navigate('detail', ${p.id})" class="bg-white border border-gray-200 text-black px-4 py-2.5 rounded-xl text-[8px] md:text-[10px] font-black uppercase tracking-wider hover:bg-gray-50 active:scale-95 transition-all cursor-pointer">
-                            Ver más
-                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Content: Image -->
+                <div class="w-full md:w-[35%] flex items-center justify-center order-1 md:order-2 relative z-10">
+                    <div class="relative w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 lg:w-72 lg:h-72 rounded-2xl overflow-hidden bg-white/5 border border-white/10 p-2 shadow-2xl hover:scale-[1.02] transition-transform duration-500 cursor-pointer" onclick="navigate('detail', ${p.id})">
+                        <img src="${p.images && p.images.length ? p.images[0] : ''}" onload="this.classList.remove('opacity-0')" class="w-full h-full object-cover rounded-xl transition-all duration-700 opacity-0">
                     </div>
                 </div>
             </div>`;
@@ -1215,10 +2355,10 @@ function renderCatalog(container) {
         <div class="product-card group relative flex flex-col justify-between ${isOutOfStock ? 'opacity-80' : ''}">
             <div>
                 <div class="aspect-[3/4] overflow-hidden bg-gray-50 rounded-[1.75rem] md:rounded-[2.5rem] mb-4 md:mb-6 relative cursor-pointer shadow-sm border border-gray-100" 
-                     onmouseenter="${isOutOfStock ? '' : `startCatalogHoverSlide(this, '${encodeURIComponent(JSON.stringify(p.images))}')`}" 
-                     onmouseleave="${isOutOfStock ? '' : `stopCatalogHoverSlide(this, '${p.images[0]}')`}"
+                     onmouseenter="${isOutOfStock ? '' : `startCatalogHoverSlide(this, '${encodeURIComponent(JSON.stringify(p.images || []))}')`}" 
+                     onmouseleave="${isOutOfStock ? '' : `stopCatalogHoverSlide(this, '${p.images && p.images.length ? p.images[0] : ''}')`}"
                      onclick="navigate('detail', ${p.id})">
-                    <img src="${p.images[0]}" onload="this.classList.remove('opacity-0')" class="product-image w-full h-full object-cover transition-all duration-700 opacity-0">
+                    <img src="${p.images && p.images.length ? p.images[0] : ''}" onload="this.classList.remove('opacity-0')" class="product-image w-full h-full object-cover transition-all duration-700 opacity-0">
                     
                     ${isOutOfStock ? `
                         <!-- Etiqueta Agotado -->
@@ -1255,57 +2395,101 @@ function renderCatalog(container) {
     if (window.initScrollReveal) {
         window.initScrollReveal();
     }
+    initRevealAnimations();
 }
 
 function renderDetail(container) {
     const p = state.selectedProduct;
     const cat = state.categories.find(c => c.id == p.categoryId);
     const categoryLabel = cat ? cat.name.toUpperCase() : 'COLECCIÓN';
+    const isOutOfStock = p.inStock === false;
+
+    // Use window.getProductFeatures helper to extract checkmark features
+    const features = window.getProductFeatures(p);
+    const featuresHTML = features.length > 0 ? `
+        <div class="space-y-3">
+            ${features.map(f => `
+                <div class="text-xs md:text-sm text-white/80 flex items-start gap-2.5 font-medium leading-relaxed">
+                    <i class="fa-solid fa-circle-check text-green-400 text-sm mt-0.5 flex-shrink-0"></i>
+                    <span>${f}</span>
+                </div>
+            `).join('')}
+        </div>
+    ` : `
+        <p class="text-xs md:text-sm leading-relaxed text-white/85 font-medium">
+            ${p.description || 'Este producto exclusivo de Emma Store no cuenta con una descripción detallada en este momento.'}
+        </p>
+    `;
 
     container.innerHTML = `
-    <div class="max-w-7xl mx-auto px-6 py-6 md:py-12 lg:flex gap-16 animate-fade">
-        <div class="lg:w-1/2 mb-8 lg:mb-0">
-            <div class="relative aspect-square bg-gray-50 rounded-[2rem] md:rounded-[3.5rem] overflow-hidden shadow-inner border border-gray-100 cursor-zoom-in group" onclick="openLightbox()">
-                <!-- Botón Volver Flotante en Imagen (Móviles) -->
-                <button onclick="event.stopPropagation(); window.goBack()" 
-                        class="md:hidden absolute top-4 left-4 z-10 w-10 h-10 bg-white/90 backdrop-blur-md text-black rounded-full flex items-center justify-center shadow-md active:scale-90 transition-all border border-gray-100">
-                    <i class="fa-solid fa-chevron-left text-sm"></i>
-                </button>
+    <div class="max-w-7xl mx-auto px-6 py-8 md:py-16 bg-black text-white rounded-[2rem] md:rounded-[3rem] shadow-2xl border border-white/5 relative overflow-hidden animate-fade mt-6">
+        <div class="absolute -left-20 -bottom-20 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
+        
+        <div class="lg:flex gap-16 items-center justify-center relative z-10 p-4 md:p-6">
+            
+            <!-- Columna Izquierda: Imagen del producto -->
+            <div class="lg:w-1/2 mb-8 lg:mb-0 reveal-up active flex flex-col items-center">
+                <div class="relative w-full aspect-square max-w-md bg-white/5 rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl border border-white/10 cursor-zoom-in group transition-transform duration-500 emma-floating-card" onclick="openLightbox()">
+                    <!-- Botón Volver Flotante en Imagen (Móviles) -->
+                    <button onclick="event.stopPropagation(); window.goBack()" 
+                            class="md:hidden absolute top-4 left-4 z-10 w-10 h-10 bg-black/80 backdrop-blur-md text-white rounded-full flex items-center justify-center shadow-md active:scale-90 transition-all border border-white/10">
+                        <i class="fa-solid fa-chevron-left text-sm"></i>
+                    </button>
 
-                <img id="detail-main-img" src="${p.images[state.detailActiveImg]}" class="w-full h-full object-cover transition-all duration-500">
+                    <img id="detail-main-img" src="${p.images[state.detailActiveImg]}" class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105">
+                    
+                    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md text-white px-5 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity shadow-xl border border-white/10">
+                        <i class="fa-solid fa-expand mr-1"></i> Expandir
+                    </div>
+                </div>
                 
-                <div class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/40 backdrop-blur-md text-white px-4 py-2 rounded-full text-[8px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                    Click para pantalla completa
+                <!-- Miniaturas -->
+                <div class="flex gap-3 mt-4 md:mt-6 overflow-x-auto no-scrollbar overscroll-x-contain scroll-smooth py-2 justify-center w-full">
+                    ${p.images.map((img, i) => `
+                        <button onclick="changeDetailImg(${i}, true)" 
+                                class="thumb-btn flex-shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl border-2 transition-all duration-300 overflow-hidden hover:-translate-y-1 ${i === state.detailActiveImg ? 'border-white opacity-100 shadow-md' : 'border-transparent opacity-50 hover:opacity-100'}">
+                            <img src="${img}" class="w-full h-full object-cover">
+                        </button>
+                    `).join('')}
                 </div>
             </div>
-            <div class="flex gap-3 mt-4 md:mt-6 overflow-x-auto no-scrollbar overscroll-x-contain scroll-smooth">
-                ${p.images.map((img, i) => `
-                    <button onclick="changeDetailImg(${i}, true)" 
-                            class="thumb-btn flex-shrink-0 w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl border-2 transition-all overflow-hidden ${i === state.detailActiveImg ? 'border-black opacity-100' : 'border-transparent opacity-50'}">
-                        <img src="${img}" class="w-full h-full object-cover">
-                    </button>
-                `).join('')}
-            </div>
-        </div>
-        <div class="lg:w-1/2 flex flex-col justify-center">
-            <p class="text-[10px] font-black opacity-30 uppercase tracking-[0.3em] mb-2">Emma Store Bolivia • ${categoryLabel}</p>
-            <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-black uppercase tracking-tighter mb-4 text-black leading-none">${p.name}</h1>
-            <p class="text-2xl md:text-3xl font-black mb-6 text-black">BS ${p.price}</p>
-            
-            <div class="mb-8 md:mb-10">
-                <h4 class="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-3">Descripción</h4>
-                <p class="text-sm leading-relaxed text-gray-600 font-medium">${p.description || 'Este producto exclusivo de Emma Store no cuenta con una descripción detallada en este momento.'}</p>
-            </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 md:mb-6">
-                <button onclick="addToCart(${p.id})" class="bg-black text-white py-4 md:py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-md hover:bg-gray-900 transition-all active:scale-95">Añadir a la bolsa</button>
-                <button onclick="askInfo(${p.id})" class="bg-green-500 text-white py-4 md:py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-md flex items-center justify-center gap-3 active:scale-95 transition-all">
-                    <i class="fa-brands fa-whatsapp text-xl"></i> Consultar Stock
+            <!-- Columna Derecha: Información del producto -->
+            <div class="lg:w-1/2 flex flex-col justify-center reveal-up active" style="transition-delay: 0.2s">
+                <div class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/10 shadow-sm mb-4 w-fit">
+                    <span class="text-[9px] font-black tracking-[0.3em] text-white/85 uppercase">Emma Store • ${categoryLabel}</span>
+                </div>
+                
+                <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter mb-4 text-white leading-none py-1">${p.name}</h1>
+                <p class="text-2xl md:text-4xl font-black mb-6 text-white">BS ${p.price}</p>
+                
+                <div class="mb-6 md:mb-8 bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10">
+                    <h4 class="text-[10px] font-black uppercase tracking-widest text-white/50 mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-circle-info"></i> Detalles del producto
+                    </h4>
+                    ${featuresHTML}
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    ${isOutOfStock ? `
+                        <button disabled class="w-full bg-white/10 text-white/40 border border-white/10 py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest cursor-not-allowed select-none">
+                            Agotado temporalmente
+                        </button>
+                    ` : `
+                        <button onclick="addToCart(${p.id})" class="btn-premium bg-white text-black py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border-none cursor-pointer">
+                            <i class="fa-solid fa-bag-shopping"></i> Añadir a la bolsa
+                        </button>
+                    `}
+                    <button onclick="askInfo(${p.id})" class="btn-premium bg-gradient-to-r from-green-500 to-green-600 text-white py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border-none cursor-pointer">
+                        <i class="fa-brands fa-whatsapp text-xl"></i> Consultar Stock
+                    </button>
+                </div>
+                
+                <button onclick="window.goBack()" class="w-full py-4 md:py-5 bg-transparent border-2 border-white/20 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/5 transition-all active:scale-95 flex items-center justify-center gap-2 group cursor-pointer">
+                    <i class="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Volver al catálogo
                 </button>
             </div>
-            <button onclick="window.goBack()" class="w-full py-4 md:py-5 border-2 border-black rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all active:scale-95 flex items-center justify-center gap-2">
-                <i class="fa-solid fa-arrow-left"></i> Volver al catálogo
-            </button>
+            
         </div>
     </div>`;
 }

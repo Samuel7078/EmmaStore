@@ -60,26 +60,27 @@
     </div>
 
     <div id="app-content">
-        <header class="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-50">
-            <div class="max-w-7xl mx-auto px-6 h-20 md:h-24 lg:h-32 flex justify-between items-center">
-                
-                <div class="flex items-center gap-2 md:gap-4">
+        <header id="main-header" class="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-50 transition-all duration-300">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 h-20 md:h-24 lg:h-32 flex justify-between items-center relative">
+                    <div class="flex items-center gap-2 md:gap-4">
                     <button id="header-back-btn" onclick="window.goBack()" class="hidden p-2.5 bg-gray-50 rounded-full hover:bg-gray-100 active:scale-95 transition-all flex items-center justify-center border border-gray-100 shadow-sm">
                         <i class="fa-solid fa-arrow-left text-xs md:text-sm text-black"></i>
                     </button>
                     
-                    <div class="flex items-center gap-2 md:gap-4 cursor-pointer mr-2" onclick="navigate('home')">
-                        <span class="w-10 h-10 lg:w-14 lg:h-14 flex items-center justify-center text-white rotate-0 hover:rotate-45 transition-transform duration-500 shadow-lg shadow-gray-100 rounded-xl overflow-hidden bg-white border border-gray-100">
-                            <img src="assets/logo.png" alt="Logo Emma Store" class="w-full h-full object-contain p-1">
-                        </span>
+                    <div id="header-logo-wrapper" class="flex items-center gap-2 md:gap-4 cursor-pointer mr-2" onclick="window.navigate('home')">
+                        <div class="emma-header-floating-logo flex items-center justify-center">
+                            <span id="header-logo-img" class="w-10 h-10 lg:w-14 lg:h-14 flex items-center justify-center text-white rotate-0 hover:rotate-45 transition-transform duration-500 shadow-lg shadow-gray-100 rounded-xl overflow-hidden bg-white border border-gray-100">
+                                <img src="assets/logo.png" alt="Logo Emma Store" class="w-full h-full object-contain p-1">
+                            </span>
+                        </div>
                         
-                        <div class="flex flex-col leading-[1.0]">
+                        <div id="header-logo-text" class="flex flex-col leading-[1.0]">
                             <span class="text-lg lg:text-2xl font-extrabold uppercase tracking-tighter text-black">EMMA</span>
                             <span class="text-sm lg:text-xl font-light uppercase tracking-[0.2em] text-black">Store</span>
                             <span class="text-[8px] lg:text-[10px] font-bold uppercase tracking-[0.3em] opacity-40 mt-0.5">Bolivia</span>
                         </div>
                     </div>
-
+ 
                     <!-- Selector de Ubicación para PC -->
                     <div class="hidden md:flex items-center gap-2 cursor-pointer border border-transparent hover:bg-gray-50 px-3 py-1.5 rounded-2xl transition-all border border-transparent hover:border-gray-100" onclick="window.openDepartmentModal()">
                         <i class="fa-solid fa-location-dot text-black text-sm"></i>
@@ -90,9 +91,22 @@
                     </div>
                 </div>
                 
+                <!-- Enlaces de Navegación (PC) -->
+                <nav class="hidden lg:flex items-center gap-8 mx-6">
+                    <button id="nav-btn-home" onclick="window.navigate('home')" class="text-xs font-black uppercase tracking-wider text-black hover:text-gray-500 transition-colors">Inicio</button>
+                    <div class="relative group py-2">
+                        <button id="nav-btn-catalog" onclick="window.navigate('catalog')" class="text-xs font-black uppercase tracking-wider text-gray-500 hover:text-black transition-colors flex items-center gap-1">
+                            Catálogo <i class="fa-solid fa-chevron-down text-[8px] transition-transform group-hover:rotate-180"></i>
+                        </button>
+                        <div id="catalog-dropdown" class="absolute left-0 mt-2 w-56 bg-white border border-gray-100 rounded-2xl shadow-xl py-3 px-2 hidden group-hover:block z-50 animate-fade">
+                            <!-- Inyectado dinámicamente -->
+                        </div>
+                    </div>
+                </nav>
+ 
                 <div class="flex items-center gap-2 md:gap-4">
                     <!-- Buscador Desktop -->
-                    <div class="hidden lg:flex items-center gap-2">
+                    <div class="hidden xl:flex items-center gap-2">
                         <div class="relative">
                             <input type="text" id="desktop-search-input" oninput="handleSearch(this.value)" placeholder="Buscar en la tienda..." 
                                 class="pl-4 pr-10 py-2.5 bg-gray-50 border border-transparent rounded-lg text-xs w-64 focus:bg-white focus:border-gray-200 outline-none transition-all font-bold uppercase">
@@ -102,11 +116,15 @@
                             <i class="fa-solid fa-sliders text-xs"></i>
                         </button>
                     </div>
-
-                    <!-- Botón Lupa Móvil -->
-                    <button onclick="toggleMobileSearch()" class="lg:hidden p-3 bg-gray-50 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center border border-gray-100">
-                        <i class="fa-solid fa-magnifying-glass text-xs text-black"></i>
-                    </button>
+ 
+                    <!-- Buscador Expandible Móvil -->
+                    <div id="mobile-header-search-container" onclick="window.handleMobileSearchClick(event)" class="xl:hidden relative flex items-center bg-gray-50 border border-gray-100 rounded-full transition-all duration-75 overflow-hidden h-9 w-[130px] sm:w-[170px] cursor-pointer">
+                        <input type="text" id="mobile-search-input-header" oninput="handleSearch(this.value)" placeholder="Buscar..." 
+                               class="w-full pl-3 pr-8 bg-transparent border-none text-[10px] sm:text-xs font-bold focus:outline-none transition-all placeholder:text-gray-400">
+                        <div class="absolute right-0 top-0 bottom-0 w-9 flex items-center justify-center pointer-events-none" id="mobile-search-icon-wrapper">
+                            <i class="fa-solid fa-magnifying-glass text-xs text-black"></i>
+                        </div>
+                    </div>
 
                     <!-- Identifícate / Mi Cuenta Dropdown -->
                     <div class="relative group" id="account-menu-container">
@@ -168,25 +186,69 @@
         <main id="main-view" class="min-h-[70vh] animate-fade">
         </main>
 
-        <footer class="bg-white border-t border-gray-100 py-20 mt-20">
-            <div class="max-w-7xl mx-auto px-6 text-center">
-                <h3 class="text-[11px] font-black mb-2 tracking-[0.5em] uppercase text-black">Emma Store Bolivia 2026</h3>
-               
-                <div class="flex flex-col items-center gap-4 mt-10">
-                    <div class="flex justify-center gap-8 text-gray-400">
-                        <i class="fa-brands fa-instagram text-lg hover:text-black cursor-pointer transition-colors"></i>
-                        <i class="fa-brands fa-facebook text-lg hover:text-black cursor-pointer transition-colors"></i>
-                        <i class="fa-brands fa-tiktok text-lg hover:text-black cursor-pointer transition-colors"></i>
+        <footer class="footer-enhanced py-16 md:py-20 mt-10">
+            <div class="max-w-7xl mx-auto px-6">
+                <!-- Grid principal -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10 mb-12">
+                    <!-- Logo y descripción -->
+                    <div>
+                        <div class="flex items-center gap-3 mb-4">
+                            <div class="w-10 h-10 rounded-xl overflow-hidden bg-white border border-gray-100 shadow-sm p-1">
+                                <img src="assets/logo.png" alt="Emma Store" class="w-full h-full object-contain">
+                            </div>
+                            <div class="flex flex-col leading-[1.0]">
+                                <span class="text-base font-extrabold uppercase tracking-tighter text-black">EMMA</span>
+                                <span class="text-xs font-light uppercase tracking-[0.2em] text-black">Store</span>
+                            </div>
+                        </div>
+                        <p class="text-[11px] text-gray-500 leading-relaxed font-medium">Tu destino para tecnología e innovación en Bolivia. Productos de calidad directo a tu hogar.</p>
                     </div>
-                    <div class="flex items-center justify-center gap-4 mt-2">
-                        <a href="#" onclick="event.preventDefault(); window.showPrivacyPolicy()" class="text-[9px] font-bold text-gray-400 hover:text-black uppercase tracking-widest hover:underline transition-colors">
-                            Políticas de Privacidad
-                        </a>
-                        <span class="text-gray-300 text-[10px]">•</span>
-                        <a href="#" onclick="event.preventDefault(); window.showPrivacyPolicy()" class="text-[9px] font-bold text-gray-400 hover:text-black uppercase tracking-widest hover:underline transition-colors">
-                            Términos y Condiciones
-                        </a>
+                    
+                    <!-- Navegación -->
+                    <div>
+                        <h4 class="text-[10px] font-black uppercase tracking-widest text-black mb-4">Navegación</h4>
+                        <div class="flex flex-col gap-3">
+                            <a href="#" onclick="event.preventDefault(); window.navigate('home')" class="footer-link">Inicio</a>
+                            <a href="#" onclick="event.preventDefault(); window.navigate('catalog')" class="footer-link">Catálogo</a>
+                            <a href="#" onclick="event.preventDefault(); window.showPrivacyPolicy()" class="footer-link">Políticas de Privacidad</a>
+                            <a href="#" onclick="event.preventDefault(); window.showPrivacyPolicy()" class="footer-link">Términos y Condiciones</a>
+                        </div>
                     </div>
+                    
+                    <!-- Contacto -->
+                    <div>
+                        <h4 class="text-[10px] font-black uppercase tracking-widest text-black mb-4">Contacto</h4>
+                        <div class="flex flex-col gap-3">
+                            <a href="https://wa.me/59178986924" target="_blank" class="footer-link flex items-center gap-2">
+                                <i class="fa-brands fa-whatsapp text-green-500"></i> WhatsApp
+                            </a>
+                            <span class="footer-link"><i class="fa-solid fa-clock text-gray-400 mr-2"></i> Lun - Sáb: 9:00 - 20:00</span>
+                            <span class="footer-link"><i class="fa-solid fa-location-dot text-gray-400 mr-2"></i> Bolivia</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Redes Sociales -->
+                    <div>
+                        <h4 class="text-[10px] font-black uppercase tracking-widest text-black mb-4">Síguenos</h4>
+                        <div class="flex gap-4 mb-4">
+                            <a href="#" class="w-10 h-10 rounded-xl bg-white border border-gray-100 shadow-sm flex items-center justify-center text-gray-500 hover:text-black hover:shadow-md hover:-translate-y-1 transition-all">
+                                <i class="fa-brands fa-instagram"></i>
+                            </a>
+                            <a href="#" class="w-10 h-10 rounded-xl bg-white border border-gray-100 shadow-sm flex items-center justify-center text-gray-500 hover:text-black hover:shadow-md hover:-translate-y-1 transition-all">
+                                <i class="fa-brands fa-facebook-f"></i>
+                            </a>
+                            <a href="#" class="w-10 h-10 rounded-xl bg-white border border-gray-100 shadow-sm flex items-center justify-center text-gray-500 hover:text-black hover:shadow-md hover:-translate-y-1 transition-all">
+                                <i class="fa-brands fa-tiktok"></i>
+                            </a>
+                        </div>
+                        <p class="text-[10px] text-gray-400 font-bold">Métodos de pago:</p>
+                        <p class="text-[10px] text-gray-500 font-medium mt-1">Efectivo • Transferencia • QR</p>
+                    </div>
+                </div>
+                
+                <!-- Línea divisoria y copyright -->
+                <div class="border-t border-gray-200 pt-8 text-center">
+                    <p class="text-[10px] font-black tracking-[0.4em] uppercase text-gray-400">© 2026 Emma Store Bolivia — Todos los derechos reservados</p>
                 </div>
             </div>
         </footer>
@@ -398,6 +460,26 @@
                 Ver resultados (0)
             </button>
         </div>
+    </div>
+    <!-- Barra de Navegación Flotante Inferior para Móviles -->
+    <div id="mobile-tab-bar" class="lg:hidden fixed bottom-4 left-4 right-4 z-50 bg-white/85 backdrop-blur-xl border border-gray-100 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] flex justify-around items-center py-2 px-2 transition-all duration-300">
+        <button onclick="window.navigate('home')" id="mobile-tab-home" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-400 hover:text-black active:scale-95 transition-all cursor-pointer bg-transparent border-none">
+            <i class="fa-solid fa-house text-base"></i>
+            <span class="text-[8px] font-black uppercase tracking-wider mt-1">Inicio</span>
+        </button>
+        <button onclick="window.navigate('catalog')" id="mobile-tab-catalog" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-400 hover:text-black active:scale-95 transition-all cursor-pointer bg-transparent border-none">
+            <i class="fa-solid fa-list-ul text-base"></i>
+            <span class="text-[8px] font-black uppercase tracking-wider mt-1">Catálogo</span>
+        </button>
+        <button onclick="window.openDepartmentModal()" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-400 hover:text-black active:scale-95 transition-all cursor-pointer bg-transparent border-none">
+            <i class="fa-solid fa-location-dot text-base"></i>
+            <span class="text-[8px] font-black uppercase tracking-wider mt-1">Envío</span>
+        </button>
+        <button onclick="window.toggleCart(true)" class="flex flex-col items-center justify-center flex-1 py-1 text-gray-400 hover:text-black active:scale-95 transition-all cursor-pointer bg-transparent border-none relative">
+            <i class="fa-solid fa-bag-shopping text-base"></i>
+            <span class="text-[8px] font-black uppercase tracking-wider mt-1">Bolsa</span>
+            <span id="mobile-cart-badge" class="absolute top-0 right-4 bg-black text-white text-[7px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-white shadow hidden">0</span>
+        </button>
     </div>
 
     <script src="index.js"></script>

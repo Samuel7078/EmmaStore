@@ -241,6 +241,61 @@ app.delete('/api/admin/emails/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// --- DYNAMIC SITEMAP ENDPOINT ---
+app.get('/sitemap.xml', async (req, res) => {
+    try {
+        const host = req.headers.host || 'emmastore.qzz.io';
+        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        const baseUrl = `${protocol}://${host}`;
+
+        // Query MySQL products & categories
+        const [products] = await pool.query("SELECT id FROM products ORDER BY id DESC");
+        const [categories] = await pool.query("SELECT id FROM categories");
+
+        let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+        xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+
+        const today = new Date().toISOString().split('T')[0];
+
+        // Home
+        xml += `  <url>\n    <loc>${baseUrl}/</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>1.0</priority>\n  </url>\n`;
+
+        // Categorías
+        for (const cat of categories) {
+            xml += `  <url>\n    <loc>${baseUrl}/?category=${cat.id}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
+        }
+
+        // Productos
+        for (const prod of products) {
+            xml += `  <url>\n    <loc>${baseUrl}/?product=${prod.id}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.9</priority>\n  </url>\n`;
+        }
+
+        xml += `</urlset>`;
+
+        res.header('Content-Type', 'application/xml');
+        res.send(xml);
+    } catch (error) {
+        console.error("Error generating sitemap dynamically:", error);
+        res.status(500).send("Error generating sitemap");
+    }
+});
+
+// --- DYNAMIC ROBOTS.TXT ENDPOINT ---
+app.get('/robots.txt', (req, res) => {
+    try {
+        const host = req.headers.host || 'emmastore.qzz.io';
+        const protocol = req.headers['x-forwarded-proto'] || 'https';
+        const baseUrl = `${protocol}://${host}`;
+
+        res.type('text/plain');
+        res.send(`User-agent: *\nAllow: /\n\nSitemap: ${baseUrl}/sitemap.xml\n`);
+    } catch (error) {
+        console.error("Error generating robots.txt dynamically:", error);
+        res.status(500).send("Error generating robots.txt");
+    }
+});
+
+
 // --- ENDPOINTS DE PRODUCTOS ---
 
 app.get('/api/products', async (req, res) => {

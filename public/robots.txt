@@ -1,5 +1,0 @@
-User-agent: *
-Allow: /
-
-# Sitemap dinámico
-Sitemap: https://emmastore.qzz.io/sitemap.xml

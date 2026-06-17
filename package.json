@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "api/index.js",
   "scripts": {
-    "vercel-build": "node scripts/generate-sitemap.js"
+    "vercel-build": "node -e \"console.log('Skipping static build - sitemaps are served dynamically')\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.0",
