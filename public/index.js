@@ -37,6 +37,13 @@ const state = {
         maxPrice: 1000,
         currentMin: 0,
         currentMax: 1000
+    },
+    // Configuración de entrega (cargada desde el servidor)
+    storeConfig: {
+        shipping_cost: 15,
+        carrier_cost: 25,
+        delivery_zones: ['Cochabamba'],
+        shipping_options: []
     }
 };
 
@@ -50,12 +57,21 @@ function getAuthHeaders() {
 async function loadData() {
     try {
         // Cargar datos de productos (MySQL/Aiven)
-        const [p, cat, con, s] = await Promise.all([
+        const [p, cat, con, s, storeConf] = await Promise.all([
             fetch('/api/products').then(r => r.json()),
             fetch('/api/categories').then(r => r.json()),
             fetch('/api/contacts').then(r => r.json()),
-            fetch('/api/stories').then(r => r.json())
+            fetch('/api/stories').then(r => r.json()),
+            fetch('/api/store-config').then(r => r.json()).catch(() => ({ shipping_cost: 15, carrier_cost: 25, delivery_zones: ['Cochabamba'] }))
         ]);
+        if (storeConf && !storeConf.error) {
+            state.storeConfig = {
+                shipping_cost: parseFloat(storeConf.shipping_cost) || 15,
+                carrier_cost: parseFloat(storeConf.carrier_cost) || 25,
+                delivery_zones: storeConf.delivery_zones || ['Cochabamba'],
+                shipping_options: storeConf.shipping_options || []
+            };
+        }
         state.products = p.map(prod => ({ 
             ...prod, 
             price: parseFloat(prod.price) || 0,
@@ -2492,6 +2508,150 @@ function renderDetail(container) {
             
         </div>
     </div>`;
+
+    // ===== PRODUCTOS SUGERIDOS =====
+    const relatedProducts = state.products.filter(rp =>
+        rp.id !== p.id && rp.categoryId == p.categoryId
+    ).slice(0, 8);
+    const otherProducts = relatedProducts.length < 4
+        ? state.products.filter(rp => rp.id !== p.id).slice(0, 8 - relatedProducts.length)
+        : [];
+    const suggestedProducts = [...relatedProducts, ...otherProducts].slice(0, 6);
+
+    if (suggestedProducts.length > 0) {
+        const suggestedDiv = document.createElement('div');
+        suggestedDiv.className = 'max-w-7xl mx-auto px-6 py-10 md:py-16';
+        suggestedDiv.innerHTML = `
+            <div class="mb-8">
+                <p class="text-[10px] md:text-xs font-black uppercase tracking-[0.4em] text-gray-400 mb-2 reveal-up">También te puede interesar</p>
+                <h2 class="text-2xl sm:text-3xl md:text-4xl font-black uppercase tracking-tighter text-black leading-none reveal-up">
+                    Productos Relacionados
+                </h2>
+            </div>
+            <div class="flex gap-4 md:gap-6 overflow-x-auto no-scrollbar pb-3 overscroll-x-contain scroll-smooth snap-x snap-mandatory">
+                ${suggestedProducts.map(sp => {
+                    const isOOS = sp.inStock === false;
+                    const catSug = state.categories.find(c => c.id == sp.categoryId);
+                    return `
+                    <div class="w-40 md:w-56 flex-shrink-0 flex flex-col justify-between group relative bg-white border border-gray-100 p-3 rounded-2xl md:rounded-[1.75rem] transition-all duration-300 hover:shadow-xl hover:border-gray-200 hover:-translate-y-1 cursor-pointer snap-start"
+                         onclick="window.navigate('detail', ${sp.id})">
+                        <div class="aspect-[3/4] overflow-hidden bg-gray-50 rounded-xl md:rounded-[1.25rem] relative mb-3">
+                            <img src="${sp.images && sp.images.length ? sp.images[0] : ''}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
+                            ${isOOS ? `<div class="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-[6px] font-black uppercase tracking-wider">Agotado</div>` : ''}
+                        </div>
+                        <div class="px-1 text-left">
+                            <span class="text-[8px] font-extrabold uppercase tracking-wider text-gray-400 block mb-1">${catSug ? catSug.name : 'Emma Store'}</span>
+                            <h4 class="text-[10px] md:text-xs font-black uppercase text-black line-clamp-1 leading-tight mb-1 group-hover:text-gray-600 transition-colors">${sp.name}</h4>
+                            <div class="flex justify-between items-center mt-2">
+                                <span class="text-[10px] md:text-xs font-black text-black">BS ${sp.price}</span>
+                                ${!isOOS ? `
+                                    <button onclick="event.stopPropagation(); addToCart(${sp.id})" class="p-2 bg-black hover:bg-gray-800 text-white rounded-lg flex items-center justify-center transition-all active:scale-90 shadow-sm border-none cursor-pointer">
+                                        <i class="fa-solid fa-plus text-[8px]"></i>
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>`;
+                }).join('')}
+            </div>
+        `;
+        container.appendChild(suggestedDiv);
+        initRevealAnimations();
+    }
+
+    // ===== FAQ COMPACTO EN DETALLE =====
+    const detailFaqs = [
+        { q: '¿Cuánto demora la entrega?', a: 'En zonas con cobertura local, el mismo día o al día siguiente. Para otras ciudades de Bolivia, 2 a 5 días hábiles por transportadora.' },
+        { q: '¿Cómo coordino el pago?', a: 'Un asesor te contactará por WhatsApp para confirmar el pedido y acordar el método de pago (efectivo, QR o transferencia).' },
+        { q: '¿Hay garantía?', a: 'Sí. Si tu producto tiene fallas de fábrica, coordina el cambio con nosotros por WhatsApp sin costo adicional.' },
+        { q: '¿Puedo pedir más fotos del producto?', a: '¡Claro! Escríbenos por WhatsApp y te enviamos fotos o videos adicionales antes de confirmar tu pedido.' }
+    ];
+
+    const faqDetailDiv = document.createElement('div');
+    faqDetailDiv.className = 'max-w-7xl mx-auto px-6 pb-16 md:pb-24';
+    faqDetailDiv.innerHTML = `
+        <div class="bg-white border border-gray-100 rounded-[2rem] md:rounded-[3rem] p-6 md:p-10 reveal-up">
+            <div class="flex items-center justify-between mb-6">
+                <div>
+                    <p class="text-[9px] font-black uppercase tracking-[0.4em] text-gray-400 mb-1">Resolvemos tus dudas</p>
+                    <h3 class="text-lg md:text-2xl font-black uppercase tracking-tighter text-black">Preguntas Frecuentes</h3>
+                </div>
+                <button onclick="window.open('https://wa.me/59178986924?text=Hola%20Emma%20Store,%20tengo%20una%20consulta', '_blank')"
+                        class="btn-premium pulse-green bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest inline-flex items-center gap-2 transition-all active:scale-95 border-none cursor-pointer">
+                    <i class="fa-brands fa-whatsapp"></i> Preguntar
+                </button>
+            </div>
+            <div class="bg-gray-50 rounded-2xl overflow-hidden">
+                ${detailFaqs.map(faq => `
+                    <div class="faq-item px-5 py-4 border-b border-gray-100 last:border-b-0" onclick="window.toggleFaq(this)">
+                        <div class="flex items-center justify-between gap-4">
+                            <h4 class="text-[10px] md:text-xs font-black text-black uppercase tracking-wider">${faq.q}</h4>
+                            <i class="fa-solid fa-chevron-down faq-chevron text-xs text-gray-400 flex-shrink-0"></i>
+                        </div>
+                        <div class="faq-answer">
+                            <p class="text-xs text-gray-500 leading-relaxed font-medium">${faq.a}</p>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    container.appendChild(faqDetailDiv);
+    initRevealAnimations();
+
+    // ===== ANIMACIONES CINEMÁTICAS EN DETALLE =====
+    requestAnimationFrame(() => {
+        // Animar título letra por letra
+        const titleEl = container.querySelector('h1');
+        if (titleEl) {
+            const text = titleEl.textContent;
+            titleEl.innerHTML = text.split('').map((ch, i) =>
+                `<span class="detail-letter" style="display:inline-block; opacity:0; transform:translateY(20px); transition: opacity 0.4s ease ${i * 0.03}s, transform 0.4s ease ${i * 0.03}s">${ch === ' ' ? '&nbsp;' : ch}</span>`
+            ).join('');
+            setTimeout(() => {
+                titleEl.querySelectorAll('.detail-letter').forEach(el => {
+                    el.style.opacity = '1';
+                    el.style.transform = 'translateY(0)';
+                });
+            }, 80);
+        }
+
+        // Animar precio con slide-up
+        const priceEl = container.querySelector('p.text-2xl, p.text-4xl');
+        if (priceEl) {
+            priceEl.style.opacity = '0';
+            priceEl.style.transform = 'translateY(16px)';
+            priceEl.style.transition = 'opacity 0.5s ease 0.35s, transform 0.5s ease 0.35s';
+            setTimeout(() => {
+                priceEl.style.opacity = '1';
+                priceEl.style.transform = 'translateY(0)';
+            }, 100);
+        }
+
+        // Animar características con stagger
+        const featureItems = container.querySelectorAll('.detail-feature-item, .space-y-3 > div, .space-y-2\\.5 > div');
+        featureItems.forEach((el, i) => {
+            el.style.opacity = '0';
+            el.style.transform = 'translateX(-12px)';
+            el.style.transition = `opacity 0.4s ease ${0.5 + i * 0.08}s, transform 0.4s ease ${0.5 + i * 0.08}s`;
+            setTimeout(() => {
+                el.style.opacity = '1';
+                el.style.transform = 'translateX(0)';
+            }, 100);
+        });
+
+        // Animar botones de acción con fade
+        const actionBtns = container.querySelectorAll('.grid.grid-cols-1.sm\\:grid-cols-2 button, .grid.grid-cols-1.sm\\:grid-cols-2 button');
+        actionBtns.forEach((btn, i) => {
+            btn.style.opacity = '0';
+            btn.style.transform = 'translateY(12px)';
+            btn.style.transition = `opacity 0.4s ease ${0.7 + i * 0.1}s, transform 0.4s ease ${0.7 + i * 0.1}s`;
+            setTimeout(() => {
+                btn.style.opacity = '1';
+                btn.style.transform = 'translateY(0)';
+            }, 100);
+        });
+    });
 }
 
 // --- MOTOR WHATSAPP ---
@@ -2548,8 +2708,17 @@ function renderCheckout(container) {
         saveInfoChecked = cache.save_info !== false ? 'checked' : '';
     }
     
-    // Costo inicial de envío (Express por defecto)
-    let shippingCost = 15.00;
+    // Determinar si el usuario está en una zona con cobertura de delivery
+    const userCity = cityVal || state.selectedDepartment || 'Cochabamba';
+    const deliveryZones = (state.storeConfig && state.storeConfig.delivery_zones) || ['Cochabamba'];
+    const isInCoverageZone = deliveryZones.some(z =>
+        userCity.toLowerCase().includes(z.toLowerCase()) || z.toLowerCase().includes(userCity.toLowerCase())
+    );
+    const shippingCostLocal = (state.storeConfig && state.storeConfig.shipping_cost) || 15;
+    const carrierCost = (state.storeConfig && state.storeConfig.carrier_cost) || 25;
+
+    // Costo inicial de envío según zona
+    let shippingCost = isInCoverageZone ? shippingCostLocal : carrierCost;
     
     const wrapper = document.createElement('div');
     wrapper.className = "max-w-7xl mx-auto px-4 py-8 lg:flex lg:gap-12 animate-fade text-black";
@@ -2654,69 +2823,38 @@ function renderCheckout(container) {
                        class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
             </div>
 
-            <!-- Apartamento/Suite y Ciudad -->
+            <!-- Apartamento/Suite y Departamento -->
             <div class="grid grid-cols-2 gap-3">
                 <input type="text" id="chk-apartment" value="${apartmentVal}" placeholder="Casa, departamento, piso, etc. (opcional)" 
                        class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
                 
                 <div class="relative text-left">
-                    <input type="text" id="chk-city" value="${cityVal}" placeholder="Ciudad" 
-                           class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
-                    <p class="text-[9px] text-red-500 font-bold mt-1 hidden" id="err-chk-city">Introduce la ciudad</p>
+                    <select id="chk-city" onchange="window.updateCheckoutZone(this.value)"
+                            class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs bg-white font-bold focus:border-black outline-none transition-all cursor-pointer">
+                        ${['Beni','Chuquisaca','Cochabamba','La Paz','Oruro','Pando','Poto\u00eds\u00ed','Santa Cruz','Tarija'].map(dept => `
+                            <option value="${dept}" ${cityVal === dept ? 'selected' : ''}>${dept}</option>
+                        `).join('')}
+                    </select>
+                    <p class="text-[9px] text-red-500 font-bold mt-1 hidden" id="err-chk-city">Selecciona tu departamento</p>
                 </div>
             </div>
 
         </div>
 
         <!-- Métodos de Envío -->
-        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4" id="checkout-shipping-section">
             <h2 class="text-xs font-black uppercase tracking-wider text-black text-left">Métodos de envío</h2>
-            
-            <div class="space-y-3">
-                <!-- Envío Delivery / Express -->
-                <label class="flex items-center justify-between p-4 border border-black rounded-2xl cursor-pointer hover:border-black transition-all select-none bg-gray-50/10 text-left" id="lbl-ship-express">
-                    <div class="flex items-center gap-3">
-                        <input type="radio" name="shipping-method" id="ship-express" value="express" checked 
-                               class="text-black focus:ring-black w-4 h-4" onchange="window.updateCheckoutShipping(15.00)">
-                        <div class="flex flex-col">
-                            <span class="text-xs font-black text-black">Envío Delivery Express (A Domicilio)</span>
-                            <span class="text-[9px] text-gray-400 font-bold">Entrega directa en la puerta de tu casa</span>
-                        </div>
-                    </div>
-                    <span class="text-xs font-black text-black">BOB 15,00</span>
-                </label>
-
-                <!-- Envío Gratis -->
-                <label class="flex items-center justify-between p-4 border border-gray-200 rounded-2xl cursor-pointer hover:border-black transition-all select-none text-left" id="lbl-ship-free">
-                    <div class="flex items-center gap-3">
-                        <input type="radio" name="shipping-method" id="ship-free" value="free" 
-                               class="text-black focus:ring-black w-4 h-4" onchange="window.updateCheckoutShipping(0.00)">
-                        <div class="flex flex-col">
-                            <span class="text-xs font-black text-black">Envío Gratis (Punto de Encuentro / Retiro)</span>
-                            <span class="text-[9px] text-gray-400 font-bold">Coordinar entrega en un punto estratégico sin costo de envío</span>
-                        </div>
-                    </div>
-                    <span class="text-xs font-black text-green-600">Gratis</span>
-                </label>
+            <div id="checkout-shipping-options">
+                ${renderCheckoutShippingHTML(isInCoverageZone, state.storeConfig.shipping_options, deliveryZones)}
             </div>
         </div>
 
         <!-- Métodos de Pago -->
-        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-3 text-left">
+        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-3 text-left" id="checkout-payment-section">
             <h2 class="text-xs font-black uppercase tracking-wider text-black">Pago</h2>
             <p class="text-[10px] text-gray-400 font-bold">Todas las transacciones son seguras y están encriptadas.</p>
-            
-            <div class="p-4 border border-black bg-gray-50/20 rounded-2xl flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="w-4 h-4 rounded-full border border-black flex items-center justify-center bg-black">
-                        <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
-                    </div>
-                    <div class="flex flex-col text-left">
-                        <span class="text-xs font-black text-black">Pago contra entrega / Contra entrega</span>
-                        <span class="text-[9px] text-gray-400 font-bold">Paga en efectivo al recibir tu pedido</span>
-                    </div>
-                </div>
-                <i class="fa-solid fa-money-bill-wave text-gray-600 text-sm"></i>
+            <div id="checkout-payment-options">
+                ${renderCheckoutPaymentHTML(isInCoverageZone, deliveryZones)}
             </div>
         </div>
 
@@ -2819,7 +2957,7 @@ function renderCheckout(container) {
     container.appendChild(wrapper);
 
     // Funciones dinámicas atadas al window para interactividad en tiempo real
-    window.updateCheckoutShipping = (cost) => {
+    window.updateCheckoutShipping = (cost, radioEl) => {
         shippingCost = cost;
         const total = subtotal + shippingCost;
         
@@ -2830,14 +2968,26 @@ function renderCheckout(container) {
         if (totalText) totalText.innerText = `BOB ${total.toFixed(2)}`;
         
         // Estilizar las tarjetas de selección
-        const lblExpress = document.getElementById('lbl-ship-express');
-        const lblFree = document.getElementById('lbl-ship-free');
-        if (cost === 0) {
-            lblFree?.classList.add('bg-gray-50/10', 'border-black');
-            lblExpress?.classList.remove('bg-gray-50/10', 'border-black');
-        } else {
-            lblExpress?.classList.add('bg-gray-50/10', 'border-black');
-            lblFree?.classList.remove('bg-gray-50/10', 'border-black');
+        const allLabels = document.querySelectorAll('.lbl-ship-option');
+        if (allLabels.length > 0) {
+            allLabels.forEach(lbl => {
+                lbl.classList.remove('bg-gray-50/10', 'border-black');
+                lbl.classList.add('border-gray-200');
+            });
+            if (radioEl) {
+                const parentLabel = radioEl.closest('.lbl-ship-option');
+                if (parentLabel) {
+                    parentLabel.classList.remove('border-gray-200');
+                    parentLabel.classList.add('bg-gray-50/10', 'border-black');
+                }
+            } else {
+                // Seleccionar el primero por defecto
+                const firstOpt = allLabels[0];
+                if (firstOpt) {
+                    firstOpt.classList.remove('border-gray-200');
+                    firstOpt.classList.add('bg-gray-50/10', 'border-black');
+                }
+            }
         }
     };
 
@@ -2864,6 +3014,115 @@ function renderCheckout(container) {
             }
         }
     };
+    window.updateCheckoutZone = (newZone) => {
+        const deliveryZones = (state.storeConfig && state.storeConfig.delivery_zones) || ['Cochabamba'];
+        const isInCoverageZone = deliveryZones.some(z =>
+            newZone.toLowerCase().includes(z.toLowerCase()) || z.toLowerCase().includes(newZone.toLowerCase())
+        );
+        const shipSection = document.getElementById('checkout-shipping-options');
+        const paySection = document.getElementById('checkout-payment-options');
+        
+        if (shipSection) shipSection.innerHTML = renderCheckoutShippingHTML(isInCoverageZone, state.storeConfig.shipping_options, deliveryZones);
+        if (paySection) paySection.innerHTML = renderCheckoutPaymentHTML(isInCoverageZone, deliveryZones);
+
+        // Actualizar el costo base (seleccionando la primera opción activa o carrier)
+        const opts = state.storeConfig.shipping_options || [];
+        const carrierCost = (state.storeConfig && state.storeConfig.carrier_cost) || 25;
+        let newCost = carrierCost;
+        if (isInCoverageZone && opts.length > 0) {
+            newCost = opts[0].price;
+        }
+        window.updateCheckoutShipping(newCost);
+    };
+
+    function renderCheckoutShippingHTML(inZone, options, zones) {
+        if (!inZone) {
+            const carrierCost = (state.storeConfig && state.storeConfig.carrier_cost) || 25;
+            return `
+            <div class="border border-gray-200 rounded-2xl p-4 flex items-start gap-3">
+                <div class="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <i class="fa-solid fa-truck text-black text-sm"></i>
+                </div>
+                <div>
+                    <p class="text-xs font-black text-black uppercase tracking-wide">Envío por Transportadora <span class="text-red-500">*</span></p>
+                    <p class="text-[10px] text-gray-500 font-medium mt-0.5 leading-relaxed">
+                        Tu departamento no tiene cobertura de delivery local. El pedido se envía a través de una transportadora y el costo adicional se te informará internamente por WhatsApp.<br>
+                        <span class="font-black mt-1 block text-black">Cargo base referencial: BOB ${carrierCost.toFixed(2)}</span>
+                    </p>
+                </div>
+            </div>
+            <input type="hidden" id="ship-express" name="shipping-method" value="carrier">
+            `;
+        }
+        
+        if (!options || options.length === 0) {
+            // Fallback
+            const sc = (state.storeConfig && state.storeConfig.shipping_cost) || 15;
+            options = [
+                { id: 1, title: 'Envío Express', description: 'A domicilio', price: sc },
+                { id: 2, title: 'Retiro', description: 'Punto estratégico', price: 0 }
+            ];
+        }
+
+        return `
+            <div class="space-y-3">
+                ${options.map((opt, idx) => `
+                <label class="flex items-center justify-between p-4 border ${idx === 0 ? 'border-black bg-gray-50/10' : 'border-gray-200'} rounded-2xl cursor-pointer hover:border-black transition-all select-none text-left lbl-ship-option" data-price="${opt.price}">
+                    <div class="flex items-center gap-3">
+                        <input type="radio" name="shipping-method" id="ship-opt-${opt.id}" ${idx === 0 ? 'id="ship-express"' : ''} value="${opt.title}" ${idx === 0 ? 'checked' : ''} 
+                               class="text-black focus:ring-black w-4 h-4" onchange="window.updateCheckoutShipping(${opt.price}, this)">
+                        <div class="flex flex-col">
+                            <span class="text-xs font-black text-black">${opt.title}</span>
+                            <span class="text-[9px] text-gray-400 font-bold">${opt.description}</span>
+                        </div>
+                    </div>
+                    <span class="text-xs font-black ${opt.price === 0 ? 'text-green-600' : 'text-black'}">${opt.price === 0 ? 'Gratis' : `BOB ${opt.price.toFixed(2)}`}</span>
+                </label>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    function renderCheckoutPaymentHTML(inZone, zones) {
+        if (inZone) {
+            return `
+            <div class="p-4 border border-black bg-gray-50/20 rounded-2xl flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-4 h-4 rounded-full border border-black flex items-center justify-center bg-black">
+                        <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                    </div>
+                    <div class="flex flex-col text-left">
+                        <span class="text-xs font-black text-black">Pago contra entrega / Contra entrega</span>
+                        <span class="text-[9px] text-gray-400 font-bold">Paga en efectivo o QR al recibir tu pedido</span>
+                    </div>
+                </div>
+                <i class="fa-solid fa-money-bill-wave text-gray-600 text-sm"></i>
+            </div>
+            `;
+        } else {
+            const zonesText = Array.isArray(zones) && zones.length > 0 ? zones.join(', ') : 'Cochabamba';
+            return `
+            <div class="border border-gray-200 rounded-2xl p-4 mb-3 flex items-start gap-3">
+                <i class="fa-solid fa-asterisk text-red-500 text-xs mt-0.5 flex-shrink-0"></i>
+                <p class="text-[10px] font-bold text-gray-500 leading-relaxed">
+                    Solo ofrecemos contra entrega en las sucursales principales (${zonesText}). Para tu departamento se requiere <span class="text-black font-black">pago previo obligatorio</span> antes del despacho.
+                </p>
+            </div>
+            <div class="p-4 border border-black bg-gray-50/20 rounded-2xl flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-4 h-4 rounded-full border border-black flex items-center justify-center bg-black">
+                        <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
+                    </div>
+                    <div class="flex flex-col text-left">
+                        <span class="text-xs font-black text-black">Transferencia Bancaria / QR</span>
+                        <span class="text-[9px] text-gray-400 font-bold">Coordina el pago con el asesor por WhatsApp antes del envío</span>
+                    </div>
+                </div>
+                <i class="fa-solid fa-qrcode text-gray-600 text-sm"></i>
+            </div>
+            `;
+        }
+    }
 
     window.submitCheckoutForm = async () => {
         // Campos

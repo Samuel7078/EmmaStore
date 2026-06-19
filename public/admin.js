@@ -233,7 +233,9 @@ function renderAdmin() {
     else if (adminState.view === 'user-detail') renderUserDetailView(main);
     else if (adminState.view === 'settings') renderSettingsView(main);
     else if (adminState.view === 'notifications') renderNotificationsView(main);
+    else if (adminState.view === 'delivery') renderDeliveryView(main);
 }
+
 
 // --- GESTIÓN DE IMÁGENES ---
 async function handleImageUpload(input, single = false) {
@@ -280,16 +282,44 @@ function removeTempImage(btn, base64) {
     btn.parentElement.remove();
 }
 
-// --- ENVÍO CON BARRA DE PROGRESO ---
-function sendWithProgress(url, method, data, callback) {
-    const xhr = new XMLHttpRequest();
-    const overlay = document.getElementById('upload-progress-overlay');
-    const bar = document.getElementById('upload-progress-bar');
-    const text = document.getElementById('upload-progress-text');
+// --- ENVÍO CON BARRA DE PROGRESO FLOTANTE (NO BLOQUEANTE) ---
+window.toggleProgressPanel = () => {
+    const content = document.getElementById('progress-panel-content');
+    const icon = document.getElementById('progress-panel-icon');
+    
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        icon.classList.remove('rotate-180');
+    } else {
+        content.classList.add('hidden');
+        icon.classList.add('rotate-180');
+    }
+};
 
-    if (overlay) {
-        overlay.classList.remove('hidden');
-        overlay.classList.add('flex');
+window.isUploading = false; // Lock global para prevenir doble subida (Throttling)
+
+function sendWithProgress(url, method, data, callback) {
+    if (window.isUploading) {
+        showAdminToast("Ya hay una subida en progreso. Por favor, espera a que termine.");
+        return;
+    }
+    
+    window.isUploading = true;
+    
+    const xhr = new XMLHttpRequest();
+    const panel = document.getElementById('admin-progress-panel');
+    const bar = document.getElementById('progress-panel-bar');
+    const text = document.getElementById('progress-panel-text');
+    const content = document.getElementById('progress-panel-content');
+    const icon = document.getElementById('progress-panel-icon');
+
+    if (panel) {
+        // Asegurarse que el panel esté visible y expandido al iniciar
+        panel.classList.remove('translate-y-full', 'opacity-0');
+        content.classList.remove('hidden');
+        icon.classList.remove('rotate-180');
+        if (bar) bar.style.width = '0%';
+        if (text) text.innerText = 'Iniciando subida...';
     }
 
     xhr.open(method, url);
@@ -299,22 +329,40 @@ function sendWithProgress(url, method, data, callback) {
         if (e.lengthComputable) {
             const percent = Math.round((e.loaded / e.total) * 100);
             if (bar) bar.style.width = percent + '%';
-            if (text) text.innerText = `Subiendo a la Nube: ${percent}%`;
+            if (text) text.innerText = `Subiendo: ${percent}%`;
         }
     };
 
     xhr.onload = () => {
         if (xhr.status === 200) {
-            if (text) text.innerText = "¡Subida Completada!";
+            if (text) text.innerText = "¡Completado!";
+            if (bar) bar.style.width = '100%';
             setTimeout(() => {
-                if (overlay) overlay.classList.add('hidden');
+                if (panel) panel.classList.add('translate-y-full', 'opacity-0');
+                window.isUploading = false; // Liberar lock
                 callback();
-            }, 1000);
+            }, 1500);
         } else {
-            alert("Error en el servidor.");
-            if (overlay) overlay.classList.add('hidden');
+            if (text) text.innerText = "Error en la subida";
+            if (bar) bar.classList.replace('bg-black', 'bg-red-500');
+            setTimeout(() => {
+                if (panel) panel.classList.add('translate-y-full', 'opacity-0');
+                if (bar) bar.classList.replace('bg-red-500', 'bg-black');
+                window.isUploading = false; // Liberar lock
+            }, 3000);
         }
     };
+    
+    xhr.onerror = () => {
+        if (text) text.innerText = "Error de conexión";
+        if (bar) bar.classList.replace('bg-black', 'bg-red-500');
+        setTimeout(() => {
+            if (panel) panel.classList.add('translate-y-full', 'opacity-0');
+            if (bar) bar.classList.replace('bg-red-500', 'bg-black');
+            window.isUploading = false; // Liberar lock
+        }, 3000);
+    };
+
     xhr.send(JSON.stringify(data));
 }
 
@@ -1864,3 +1912,346 @@ function logoutAdmin() {
     localStorage.removeItem('emma_admin_session');
     location.reload();
 }
+
+// =============================================
+// VISTA: ENTREGA (Precio, Transportadora, Zonas)
+// =============================================
+const BOLIVIA_DEPARTMENTS = [
+    'Beni', 'Chuquisaca', 'Cochabamba', 'La Paz',
+    'Oruro', 'Pando', 'Potosí', 'Santa Cruz', 'Tarija'
+];
+
+async function renderDeliveryView(container) {
+    container.innerHTML = `
+        <h2 class="text-2xl md:text-4xl font-black uppercase tracking-tighter mb-8 md:mb-12 animate-fade">Configuración de Entrega</h2>
+        <div id="delivery-loading" class="flex items-center justify-center py-20">
+            <i class="fa-solid fa-circle-notch animate-spin text-3xl text-gray-300"></i>
+        </div>
+    `;
+    try {
+        const [configRes, optionsRes] = await Promise.all([
+            fetch('/api/admin/store-config'),
+            fetch('/api/admin/shipping-options')
+        ]);
+        const config = await configRes.json();
+        const options = await optionsRes.json();
+        renderDeliveryContent(container, config, options);
+    } catch (err) {
+        container.innerHTML += `<p class="text-red-500 text-center">Error cargando configuración</p>`;
+    }
+}
+
+async function refreshDeliveryDataSilently() {
+    try {
+        const [configRes, optionsRes] = await Promise.all([
+            fetch('/api/admin/store-config'),
+            fetch('/api/admin/shipping-options')
+        ]);
+        const config = await configRes.json();
+        const options = await optionsRes.json();
+        const container = document.getElementById('admin-main');
+        if (container) {
+            renderDeliveryContent(container, config, options);
+        }
+    } catch (err) {
+        console.error("Error al recargar datos de entrega silenciosamente", err);
+    }
+}
+
+function renderDeliveryContent(container, config, options) {
+    const zones = config.delivery_zones || ['Cochabamba'];
+    const lastUpdate = config.updated_at ? new Date(config.updated_at).toLocaleString('es-BO', { timeZone: 'America/La_Paz' }) : 'Nunca';
+
+    container.innerHTML = `
+        <div class="flex items-center justify-between mb-8 md:mb-12 animate-fade">
+            <div>
+                <h2 class="text-2xl md:text-4xl font-black uppercase tracking-tighter">Configuración de Entrega</h2>
+                <p class="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Última actualización: ${lastUpdate}</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 animate-fade mb-6 md:mb-8">
+
+            <!-- MÓDULO: Opciones de Envío (CRUD) -->
+            <div class="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm flex flex-col">
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-black text-white rounded-2xl flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid fa-truck-fast text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black uppercase tracking-tighter">Métodos de Envío</h3>
+                            <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Para zonas con sucursal</p>
+                        </div>
+                    </div>
+                    <button onclick="openShippingOptionModal()" class="w-8 h-8 bg-gray-100 hover:bg-black hover:text-white rounded-xl flex items-center justify-center transition-colors">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                    </button>
+                </div>
+
+                <div class="space-y-3 flex-1 overflow-y-auto max-h-[400px] pr-2 custom-scrollbar">
+                    ${options.map(opt => `
+                        <div class="border border-gray-100 p-4 rounded-2xl relative group ${opt.is_active ? 'bg-white' : 'bg-gray-50 opacity-60'}">
+                            <div class="absolute top-3 right-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button onclick="openShippingOptionModal(${opt.id})" class="w-6 h-6 rounded bg-gray-100 text-gray-600 hover:bg-blue-100 hover:text-blue-600 flex items-center justify-center text-[10px]">
+                                    <i class="fa-solid fa-pen"></i>
+                                </button>
+                                <button onclick="deleteShippingOption(${opt.id})" class="w-6 h-6 rounded bg-gray-100 text-gray-600 hover:bg-red-100 hover:text-red-600 flex items-center justify-center text-[10px]">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </div>
+                            <h4 class="text-xs font-black uppercase tracking-wide text-black pr-16">${opt.title}</h4>
+                            <p class="text-[10px] text-gray-400 font-bold mt-1 line-clamp-2">${opt.description || 'Sin descripción'}</p>
+                            <div class="flex justify-between items-end mt-3">
+                                <span class="text-[9px] font-black uppercase tracking-widest px-2 py-1 bg-gray-100 rounded-lg text-gray-500">${opt.type}</span>
+                                <span class="text-xs font-black ${opt.price == 0 ? 'text-green-600' : 'text-black'}">${opt.price == 0 ? 'GRATIS' : `Bs. ${opt.price}`}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                    ${options.length === 0 ? '<p class="text-center text-[10px] text-gray-400 font-bold py-4">No hay métodos configurados</p>' : ''}
+                </div>
+            </div>
+
+            <!-- MÓDULO: Zonas y Transportadora -->
+            <div class="space-y-6 md:space-y-8">
+                
+                <!-- Zonas de Cobertura -->
+                <div class="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="w-10 h-10 bg-black text-white rounded-2xl flex items-center justify-center flex-shrink-0">
+                            <i class="fa-solid fa-map-location-dot text-sm"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-black uppercase tracking-tighter">Zonas con Sucursales</h3>
+                            <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Habilita delivery y contra entrega</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 mb-6" id="delivery-zones-grid">
+                        ${BOLIVIA_DEPARTMENTS.map(dept => {
+                            const isChecked = zones.includes(dept);
+                            return `
+                            <div onclick="toggleDeliveryZone(this, '${dept}')"
+                                 class="zone-chip cursor-pointer py-3 px-2 rounded-2xl border-2 text-center transition-all select-none
+                                        ${isChecked ? 'bg-black text-white border-black' : 'bg-gray-50 text-gray-500 border-gray-100 hover:border-gray-300'}"
+                                 data-zone="${dept}" data-active="${isChecked}">
+                                <p class="text-[9px] font-black uppercase tracking-wide">${dept}</p>
+                                <i class="fa-solid ${isChecked ? 'fa-check' : 'fa-plus'} text-[8px] mt-1"></i>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                    <button onclick="saveDeliveryZones()" class="w-full py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 active:scale-95 transition-all cursor-pointer border-none shadow-xl">
+                        Guardar Zonas
+                    </button>
+                </div>
+
+                <!-- Cargo Transportadora (Fuera de zona) -->
+                <div class="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm">
+                    <label class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-2">
+                        <i class="fa-solid fa-truck mr-1 text-orange-500"></i>
+                        Cargo Base Transportadora
+                    </label>
+                    <div class="flex items-center gap-3">
+                        <div class="flex items-center gap-2 flex-1 bg-orange-50 border-2 border-transparent focus-within:border-orange-400 rounded-2xl px-4 py-3 transition-all">
+                            <span class="text-xs font-black text-orange-400">Bs.</span>
+                            <input type="number" id="delivery-carrier-cost" value="${config.carrier_cost}" min="0" step="0.5"
+                                class="flex-1 bg-transparent text-sm font-black outline-none text-black">
+                        </div>
+                        <button onclick="saveCarrierCost()" class="px-6 py-3 bg-orange-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 active:scale-95 transition-all cursor-pointer border-none">
+                            Guardar
+                        </button>
+                    </div>
+                    <p class="text-[9px] text-gray-400 font-bold mt-2">Referencia de costo para envíos fuera de zona. (Se informa internamente el costo final).</p>
+                </div>
+                
+            </div>
+        </div>
+
+        <!-- Modal Opciones de Envío -->
+        <div id="shipping-opt-modal" class="fixed inset-0 bg-black/50 z-[200] hidden items-center justify-center p-4">
+            <div class="bg-white w-full max-w-md rounded-[2rem] p-8 animate-fade relative">
+                <button onclick="closeShippingOptionModal()" class="absolute top-6 right-6 text-gray-400 hover:text-black">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+                <h3 class="text-lg font-black uppercase tracking-tighter mb-6" id="sh-modal-title">Nueva Opción</h3>
+                
+                <input type="hidden" id="sh-id" value="">
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Título</label>
+                        <input type="text" id="sh-title" placeholder="Ej: Envío Express" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-black focus:border-black outline-none">
+                    </div>
+                    <div>
+                        <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Descripción</label>
+                        <textarea id="sh-desc" placeholder="Ej: Llega en 24 horas..." rows="2" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-medium focus:border-black outline-none"></textarea>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Precio (Bs.)</label>
+                            <input type="number" id="sh-price" value="0" min="0" step="0.5" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-black focus:border-black outline-none">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Tipo</label>
+                            <select id="sh-type" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-black focus:border-black outline-none cursor-pointer">
+                                <option value="domicilio">Domicilio</option>
+                                <option value="encomienda">Encomienda</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 block">Orden (Prioridad)</label>
+                            <input type="number" id="sh-order" value="0" min="0" class="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-xs font-black focus:border-black outline-none">
+                        </div>
+                        <div class="flex items-center gap-2 mt-6">
+                            <input type="checkbox" id="sh-active" checked class="w-4 h-4 accent-black cursor-pointer">
+                            <label class="text-[10px] font-black uppercase tracking-widest cursor-pointer select-none" for="sh-active">Activo</label>
+                        </div>
+                    </div>
+                    <button onclick="saveShippingOption()" class="w-full py-4 mt-2 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-900 transition-all">
+                        Guardar Opción
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Confirmación Eliminar -->
+        <div id="delete-sh-modal" class="fixed inset-0 bg-black/50 z-[200] hidden items-center justify-center p-4">
+            <div class="bg-white w-full max-w-sm rounded-[2rem] p-8 text-center animate-fade">
+                <div class="w-16 h-16 bg-red-100 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <i class="fa-solid fa-triangle-exclamation text-2xl"></i>
+                </div>
+                <h3 class="text-lg font-black uppercase tracking-tighter mb-2">¿Eliminar Opción?</h3>
+                <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-8">Esta acción no se puede deshacer.</p>
+                <input type="hidden" id="delete-sh-id" value="">
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="closeDeleteShippingModal()" class="w-full py-4 bg-gray-100 text-gray-500 hover:text-black hover:bg-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                        Cancelar
+                    </button>
+                    <button onclick="executeDeleteShippingOption()" class="w-full py-4 bg-red-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-600 transition-all">
+                        Sí, Eliminar
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    window.adminOptionsCache = options; // Cache para edición
+}
+
+window.openShippingOptionModal = (id = null) => {
+    document.getElementById('shipping-opt-modal').classList.remove('hidden');
+    document.getElementById('shipping-opt-modal').classList.add('flex');
+    const modalTitle = document.getElementById('sh-modal-title');
+    
+    if (id) {
+        modalTitle.innerText = "Editar Opción";
+        const opt = window.adminOptionsCache.find(o => o.id === id);
+        if(opt) {
+            document.getElementById('sh-id').value = opt.id;
+            document.getElementById('sh-title').value = opt.title;
+            document.getElementById('sh-desc').value = opt.description;
+            document.getElementById('sh-price').value = opt.price;
+            document.getElementById('sh-type').value = opt.type;
+            document.getElementById('sh-order').value = opt.sort_order;
+            document.getElementById('sh-active').checked = opt.is_active == 1;
+        }
+    } else {
+        modalTitle.innerText = "Nueva Opción";
+        document.getElementById('sh-id').value = '';
+        document.getElementById('sh-title').value = '';
+        document.getElementById('sh-desc').value = '';
+        document.getElementById('sh-price').value = '0';
+        document.getElementById('sh-type').value = 'domicilio';
+        document.getElementById('sh-order').value = '0';
+        document.getElementById('sh-active').checked = true;
+    }
+};
+
+window.closeShippingOptionModal = () => {
+    document.getElementById('shipping-opt-modal').classList.add('hidden');
+    document.getElementById('shipping-opt-modal').classList.remove('flex');
+};
+
+window.saveShippingOption = () => {
+    const id = document.getElementById('sh-id').value;
+    const data = {
+        title: document.getElementById('sh-title').value.trim(),
+        description: document.getElementById('sh-desc').value.trim(),
+        price: parseFloat(document.getElementById('sh-price').value) || 0,
+        type: document.getElementById('sh-type').value,
+        sort_order: parseInt(document.getElementById('sh-order').value) || 0,
+        is_active: document.getElementById('sh-active').checked ? 1 : 0
+    };
+    
+    if (!data.title) return alert("El título es obligatorio");
+    
+    const url = id ? `/api/admin/shipping-options/${id}` : '/api/admin/shipping-options';
+    const method = id ? 'PUT' : 'POST';
+    
+    sendWithProgress(url, method, data, () => {
+        closeShippingOptionModal();
+        showAdminToast("Opción guardada con éxito");
+        refreshDeliveryDataSilently();
+    });
+};
+
+window.deleteShippingOption = (id) => {
+    document.getElementById('delete-sh-id').value = id;
+    document.getElementById('delete-sh-modal').classList.remove('hidden');
+    document.getElementById('delete-sh-modal').classList.add('flex');
+};
+
+window.closeDeleteShippingModal = () => {
+    document.getElementById('delete-sh-modal').classList.add('hidden');
+    document.getElementById('delete-sh-modal').classList.remove('flex');
+};
+
+window.executeDeleteShippingOption = () => {
+    const id = document.getElementById('delete-sh-id').value;
+    sendWithProgress(`/api/admin/shipping-options/${id}`, 'DELETE', {}, () => {
+        closeDeleteShippingModal();
+        showAdminToast("Opción eliminada con éxito");
+        refreshDeliveryDataSilently();
+    });
+};
+
+window.toggleDeliveryZone = (el, zone) => {
+    const isActive = el.getAttribute('data-active') === 'true';
+    el.setAttribute('data-active', !isActive);
+    if (!isActive) {
+        el.classList.add('bg-black', 'text-white', 'border-black');
+        el.classList.remove('bg-gray-50', 'text-gray-500', 'border-gray-100');
+        el.querySelector('i').className = 'fa-solid fa-check text-[8px] mt-1';
+    } else {
+        el.classList.remove('bg-black', 'text-white', 'border-black');
+        el.classList.add('bg-gray-50', 'text-gray-500', 'border-gray-100');
+        el.querySelector('i').className = 'fa-solid fa-plus text-[8px] mt-1';
+    }
+};
+
+window.saveCarrierCost = () => {
+    const cost = parseFloat(document.getElementById('delivery-carrier-cost').value);
+    if (isNaN(cost) || cost < 0) return showAdminToast('Precio inválido');
+    
+    sendWithProgress('/api/admin/store-config', 'PUT', { carrier_cost: cost }, () => {
+        showAdminToast('✓ Cargo transportadora guardado: Bs. ' + cost.toFixed(2));
+        refreshDeliveryDataSilently();
+    });
+};
+
+window.saveDeliveryZones = () => {
+    const chips = document.querySelectorAll('#delivery-zones-grid .zone-chip');
+    const zones = [];
+    chips.forEach(chip => {
+        if (chip.getAttribute('data-active') === 'true') {
+            zones.push(chip.getAttribute('data-zone'));
+        }
+    });
+    
+    sendWithProgress('/api/admin/store-config', 'PUT', { delivery_zones: zones }, () => {
+        showAdminToast(`✓ ${zones.length} zona(s) guardada(s)`);
+        refreshDeliveryDataSilently();
+    });
+};

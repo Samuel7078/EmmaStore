@@ -1191,4 +1191,162 @@ app.post('/api/admin/emails/verify-otp', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// =============================================
+// STORE CONFIG (Precio Envío, Transportadora, Zonas)
+// =============================================
+
+async function initStoreConfig() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS store_config (
+            id INT PRIMARY KEY DEFAULT 1,
+            shipping_cost DECIMAL(10,2) DEFAULT 15.00,
+            carrier_cost DECIMAL(10,2) DEFAULT 25.00,
+            delivery_zones JSON DEFAULT ('["Cochabamba"]'),
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )
+    `);
+    const [rows] = await pool.query("SELECT * FROM store_config WHERE id = 1");
+    if (rows.length === 0) {
+        await pool.query(
+            "INSERT INTO store_config (id, shipping_cost, carrier_cost, delivery_zones) VALUES (1, 15.00, 25.00, ?)",
+            [JSON.stringify(["Cochabamba"])]
+        );
+    }
+}
+
+// Endpoint público — movido al bloque SHIPPING OPTIONS (incluye opciones de envío)
+
+
+// Endpoint admin — leer configuración completa
+app.get('/api/admin/store-config', async (req, res) => {
+    try {
+        await initStoreConfig();
+        const [rows] = await pool.query("SELECT * FROM store_config WHERE id = 1");
+        if (rows.length === 0) return res.json({ shipping_cost: 15, carrier_cost: 25, delivery_zones: ["Cochabamba"] });
+        const r = rows[0];
+        res.json({
+            shipping_cost: parseFloat(r.shipping_cost),
+            carrier_cost: parseFloat(r.carrier_cost),
+            delivery_zones: typeof r.delivery_zones === 'string' ? JSON.parse(r.delivery_zones) : r.delivery_zones,
+            updated_at: r.updated_at
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Endpoint admin — actualizar configuración
+app.put('/api/admin/store-config', async (req, res) => {
+    try {
+        await initStoreConfig();
+        const { shipping_cost, carrier_cost, delivery_zones } = req.body;
+        const updates = [];
+        const values = [];
+        if (shipping_cost !== undefined) { updates.push('shipping_cost = ?'); values.push(parseFloat(shipping_cost)); }
+        if (carrier_cost !== undefined) { updates.push('carrier_cost = ?'); values.push(parseFloat(carrier_cost)); }
+        if (delivery_zones !== undefined) { updates.push('delivery_zones = ?'); values.push(JSON.stringify(delivery_zones)); }
+        if (updates.length === 0) return res.status(400).json({ error: "Nada que actualizar" });
+        values.push(1);
+        await pool.query(`UPDATE store_config SET ${updates.join(', ')} WHERE id = ?`, values);
+        await createLog("CONFIG_ENTREGA", `Actualizado: ${updates.join(', ')}`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// =============================================
+// SHIPPING OPTIONS — CRUD completo
+// =============================================
+
+async function initShippingOptions() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS shipping_options (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(120) NOT NULL,
+            description VARCHAR(255),
+            price DECIMAL(10,2) DEFAULT 0.00,
+            type ENUM('domicilio','encomienda') DEFAULT 'domicilio',
+            sort_order INT DEFAULT 0,
+            is_active TINYINT(1) DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    `);
+    const [rows] = await pool.query("SELECT COUNT(*) as cnt FROM shipping_options");
+    if (rows[0].cnt === 0) {
+        await pool.query(`
+            INSERT INTO shipping_options (title, description, price, type, sort_order) VALUES
+            ('Envío Delivery Express', 'Entrega directa en la puerta de tu casa', 15.00, 'domicilio', 1),
+            ('Retiro en Punto de Encuentro', 'Coordinar entrega en un punto estratégico sin costo de envío', 0.00, 'domicilio', 2)
+        `);
+    }
+}
+
+// Público: obtener opciones activas + config + zonas
+app.get('/api/store-config', async (req, res) => {
+    try {
+        await initStoreConfig();
+        await initShippingOptions();
+        const [cfgRows] = await pool.query("SELECT shipping_cost, carrier_cost, delivery_zones FROM store_config WHERE id = 1");
+        const [optRows] = await pool.query("SELECT * FROM shipping_options WHERE is_active = 1 ORDER BY sort_order, id");
+        const cfg = cfgRows[0] || { shipping_cost: 15, carrier_cost: 25, delivery_zones: '["Cochabamba"]' };
+        res.json({
+            shipping_cost: parseFloat(cfg.shipping_cost),
+            carrier_cost: parseFloat(cfg.carrier_cost),
+            delivery_zones: typeof cfg.delivery_zones === 'string' ? JSON.parse(cfg.delivery_zones) : cfg.delivery_zones,
+            shipping_options: optRows.map(o => ({ ...o, price: parseFloat(o.price) }))
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Admin: listar todas las opciones
+app.get('/api/admin/shipping-options', async (req, res) => {
+    try {
+        await initShippingOptions();
+        const [rows] = await pool.query("SELECT * FROM shipping_options ORDER BY sort_order, id");
+        res.json(rows.map(o => ({ ...o, price: parseFloat(o.price) })));
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Admin: crear opción
+app.post('/api/admin/shipping-options', async (req, res) => {
+    try {
+        await initShippingOptions();
+        const { title, description = '', price = 0, type = 'domicilio', sort_order = 0 } = req.body;
+        if (!title) return res.status(400).json({ error: "Título requerido" });
+        const [result] = await pool.query(
+            "INSERT INTO shipping_options (title, description, price, type, sort_order) VALUES (?, ?, ?, ?, ?)",
+            [title, description, parseFloat(price), type, sort_order]
+        );
+        await createLog("SHIPPING_OPTION_ADD", `Nueva opción: ${title}`);
+        res.json({ success: true, id: result.insertId });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Admin: actualizar opción
+app.put('/api/admin/shipping-options/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { title, description, price, type, sort_order, is_active } = req.body;
+        const updates = []; const values = [];
+        if (title !== undefined) { updates.push('title = ?'); values.push(title); }
+        if (description !== undefined) { updates.push('description = ?'); values.push(description); }
+        if (price !== undefined) { updates.push('price = ?'); values.push(parseFloat(price)); }
+        if (type !== undefined) { updates.push('type = ?'); values.push(type); }
+        if (sort_order !== undefined) { updates.push('sort_order = ?'); values.push(sort_order); }
+        if (is_active !== undefined) { updates.push('is_active = ?'); values.push(is_active ? 1 : 0); }
+        if (updates.length === 0) return res.status(400).json({ error: "Nada que actualizar" });
+        values.push(id);
+        await pool.query(`UPDATE shipping_options SET ${updates.join(', ')} WHERE id = ?`, values);
+        await createLog("SHIPPING_OPTION_EDIT", `Opción ${id} actualizada`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Admin: eliminar opción
+app.delete('/api/admin/shipping-options/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await pool.query("DELETE FROM shipping_options WHERE id = ?", [id]);
+        await createLog("SHIPPING_OPTION_DELETE", `Opción ${id} eliminada`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 module.exports = app;
