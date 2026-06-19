@@ -116,3 +116,42 @@ Actualmente, el sistema experimenta un fallo **exclusivamente en el entorno de d
 - **Causa**: Es un *bug* documentado de la librería interna de NodeJS (`libuv`) en el sistema operativo Windows cuando se combinan múltiples procesos asíncronos de resolución DNS y envío por SMTP utilizando `nodemailer` a través del emulador local `vercel dev`.
 - **Efecto**: El servidor local "crashea" inesperadamente después o durante el envío de correos, obligando a reiniciar el comando en la terminal.
 - **Solución Real**: Este error **no afecta el entorno de producción**. Una vez desplegado el código a los servidores reales de Vercel en la nube (Linux/Serverless), las peticiones UDP asíncronas de Nodemailer se resolverán perfectamente sin colapsos. Por ahora, a nivel local, simplemente se debe reiniciar el comando (`Ctrl+C` y luego `vercel dev`) en la terminal si esto sucede.
+
+---
+
+## 14. Caché de Términos y Condiciones
+- **Mejora de UX**: Implementamos un registro en `localStorage` (`emma_tc_accepted`) que recuerda si el usuario ya aceptó los términos y condiciones de compra y privacidad. Esto evita que la casilla de verificación sea mostrada repetitivamente en futuras compras, agilizando el checkout de los usuarios (tanto visitantes como registrados).
+
+---
+## 15. SEO Dinámico y Resolución de Dominios en Google Search Console
+- **Sitemap Dinámico de Tiempo de Ejecución**: Rediseñamos el sistema para servir el sitemap dinámicamente en la ruta `/sitemap.xml` mediante `/api/index.js`. Esto permite extraer en tiempo real las categorías y productos de la base de datos y generar al instante el XML con etiquetas de última modificación `<lastmod>` válidas.
+- **Resolución Automática de Dominios**: El endpoint dinámico resuelve el dominio base leyendo los encabezados del host (`req.headers.host`), garantizando que las URLs del sitemap (`<loc>`) siempre coincidan con el dominio en el que Google realiza la consulta (ej. `www.emmastore.net`), solucionando el error de "dominio cruzado no permitido" en Google Search Console.
+- **Robots.txt Dinámico**: Reemplazamos el robots.txt estático por una ruta dinámica que apunta dinámicamente a la URL absoluta del sitemap basada en el dominio consultado.
+- **Limpieza de Conflictos en Vercel**: Eliminamos por completo los archivos estáticos `public/sitemap.xml` y `public/robots.txt` del repositorio, y desactivamos la compilación estática en el `"vercel-build"` de `package.json`, asegurando que Vercel no sirva archivos estáticos obsoletos y deje pasar las solicitudes a los endpoints dinámicos.
+- **Mejora del Script Estático**: Refactorizamos `scripts/generate-sitemap.js` para normalizar el URL base (limpieza de barras diagonales para evitar problemas como `//?product=`) e incluir el tag `<lastmod>` para ejecuciones y auditorías locales.
+
+---
+
+## 16. Panel de Cuotas y Control de Correos (Settings UI)
+- **Migración de Entorno a BD**: Creamos la tabla `email_settings` en MySQL para llevar un control permanente e independiente sobre qué método de envío usar para clientes (SendPulse API vs Gmail SMTP) sin depender de variables de entorno estáticas.
+- **Auto-Reset Inteligente**: El servidor verifica la fecha (`last_reset_date`); si es un nuevo día, los contadores diarios de los envíos de Gmail se reinician automáticamente a 0, protegiendo al sistema de bloqueos por superar el límite gratuito de Google. SendPulse mantiene un conteo acumulativo total.
+- **UI Dinámica en Administrador**: Se diseñó e integró una interfaz moderna dentro del Panel de Administración (Configuración ⚙️) que muestra en tiempo real cuántos mensajes se han despachado hoy por cada correo. Cuenta con botones reactivos para alternar en un clic entre SendPulse o Gmail sin necesidad de tocar el código.
+
+---
+
+## 17. Correcciones Críticas de API y Sistema
+- **Error 422 de SendPulse**: Se corrigió un bloqueo en el envío por SendPulse. La plataforma rechaza tajantemente correos salientes cuyo remitente ("From") no esté validado en su propio Dashboard (ej. intentar enviar un correo como si fuera Gmail desde SendPulse sin verificarlo). Modificamos la API para priorizar siempre el correo oficial de SendPulse (`SENDPULSE_SENDER_EMAIL`).
+- **Bug 404 Vercel Local**: Se solventó y clarificó un problema donde `vercel dev` colapsaba ante mínimos errores de sintaxis en NodeJS, resultando en respuestas "404 NOT_FOUND" globales en todos los endpoints `/api/*` y requiriendo reinicios forzados en Windows.
+- **Despliegue a Producción Limpio**: Previo al pase final a producción, se ejecutó una depuración y borrado completo (`TRUNCATE`) de los pedidos ficticios de prueba, reseteando los autoincrementables y entregando la base de datos inmaculada.
+- **Error de Lectura de Sitemap**: Solucionamos la incompatibilidad del sitemap con Google Search Console. Al eliminar el doble slash en las URLs generadas, agregar `<lastmod>` y remover los archivos estáticos que bloqueaban la redirección de Vercel, el sitemap se sirve de manera totalmente compatible e indexable en producción.
+
+---
+
+## 18. Optimización de Transiciones y Menús del Header (Móvil & PC)
+- **Reducción de Ruido Visual**:
+  - Eliminamos el botón de "Ir a catálogo" del header en móviles para maximizar el espacio útil.
+  - Ocultamos el botón "Beneficios" del menú de navegación superior en PC para una interfaz más despejada y elegante.
+- **Lógica Matemática de Scroll y Animaciones**:
+  - Rediseñamos completamente la lógica de transición `updateLogoTransition` en `public/index.js`. En lugar de llamar de forma repetitiva y costosa a `getBoundingClientRect()` (lo cual provocaba *layout thrashing* e interrupciones en la renderización), calculamos matemáticamente el escalado del logo y los iconos en base a las posiciones absolutas.
+  - **Sincronización Fluida**: El buscador móvil extendido (con su texto interactivo "Buscar") y la sección de perfil (con el nombre del usuario o la etiqueta "Invitado") se contraen simultánea y proporcionalmente al hacer scroll hacia abajo, regresando de manera fluida a la lupa compacta y al avatar predeterminado de perfil.
+  - **Límites de Pantallas Angostas (Responsive)**: Añadimos un límite dinámico para el ancho de la caja de búsqueda en pantallas de menos de 360px de ancho para evitar desbordes visuales o que se descuadre el botón del carrito de compras (bolsa) en la barra de navegación móvil.
