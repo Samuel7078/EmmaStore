@@ -1628,9 +1628,6 @@ function renderHero(container) {
 
     container.appendChild(heroDiv);
 
-    // Activar animaciones reveal del Hero
-    initRevealAnimations();
-
     // Inicializar carrusel del hero si hay más de 1 imagen
     if (heroImages.length > 1) {
         let currentImg = 0;
@@ -2496,8 +2493,8 @@ function renderDetail(container) {
                             <i class="fa-solid fa-bag-shopping"></i> Añadir a la bolsa
                         </button>
                     `}
-                    <button onclick="askInfo(${p.id})" class="btn-premium bg-gradient-to-r from-green-500 to-green-600 text-white py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border-none cursor-pointer">
-                        <i class="fa-brands fa-whatsapp text-xl"></i> Consultar Stock
+                    <button onclick="askInfo(${p.id})" class="btn-premium bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border-none cursor-pointer">
+                        <i class="fa-solid fa-bolt text-sm"></i> Realizar pedido
                     </button>
                 </div>
                 
@@ -2715,18 +2712,18 @@ function renderCheckout(container) {
         userCity.toLowerCase().includes(z.toLowerCase()) || z.toLowerCase().includes(userCity.toLowerCase())
     );
     const shippingCostLocal = (state.storeConfig && state.storeConfig.shipping_cost) || 15;
-    const carrierCost = (state.storeConfig && state.storeConfig.carrier_cost) || 25;
+    const carrierCost = 0;
 
     // Costo inicial de envío según zona
     let shippingCost = isInCoverageZone ? shippingCostLocal : carrierCost;
     
     const wrapper = document.createElement('div');
-    wrapper.className = "max-w-7xl mx-auto px-4 py-8 lg:flex lg:gap-12 animate-fade text-black";
+    wrapper.className = "max-w-7xl mx-auto px-4 py-8 flex flex-col lg:flex-row lg:gap-12 animate-fade text-black";
     
     // Estructura de dos columnas
     wrapper.innerHTML = `
     <!-- Columna Izquierda: Formulario (Shopify Checkout) -->
-    <div class="lg:w-7/12 space-y-8">
+    <div class="w-full lg:w-7/12 space-y-8 order-2 lg:order-1">
         
         <!-- Sección de Contacto -->
         <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm text-left">
@@ -2773,25 +2770,12 @@ function renderCheckout(container) {
             <!-- Campo oculto para guardar el ID de la dirección seleccionada -->
             <input type="hidden" id="chk-address-id" value="${defaultAddr ? defaultAddr.id : ''}">
 
-            <!-- Etiqueta de la dirección (solo visible si es nueva) -->
-            <div id="chk-address-label-container" class="relative text-left ${hasAddresses ? 'hidden' : ''}">
-                <input type="text" id="chk-address-label" placeholder="Nombre de la ubicación (Ej: CASA, OFICINA)" 
-                       class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium uppercase">
-            </div>
-
-            <!-- País -->
-            <div class="flex flex-col gap-1.5 text-left">
-                <label class="text-[8px] font-black uppercase tracking-widest text-gray-400">País / Región</label>
-                <select id="chk-country" class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs bg-gray-50 font-bold focus:border-black outline-none transition-all">
-                    <option value="Bolivia">Bolivia</option>
-                </select>
-            </div>
-
             <!-- Nombre y Apellidos -->
-            <div class="grid grid-cols-2 gap-3">
-                <div class="flex flex-col gap-1">
-                    <input type="text" id="chk-first-name" value="${firstNameVal}" placeholder="Nombre (opcional)" 
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div class="flex flex-col gap-1 text-left">
+                    <input type="text" id="chk-first-name" value="${firstNameVal}" placeholder="Nombre" 
                            class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
+                    <p class="text-[9px] text-red-500 font-bold mt-1 hidden" id="err-chk-first-name">Introduce tu nombre</p>
                 </div>
                 <div class="flex flex-col gap-1 text-left">
                     <input type="text" id="chk-last-name" value="${lastNameVal}" placeholder="Apellidos" 
@@ -2800,42 +2784,61 @@ function renderCheckout(container) {
                 </div>
             </div>
 
-            <!-- Dirección -->
-            <div class="relative text-left">
-                <input type="text" id="chk-address" value="${addressVal}" placeholder="Dirección (Calle, avenida, Nro. de casa/puerta)" 
-                       class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
-                <p class="text-[9px] text-red-500 font-bold mt-1 hidden" id="err-chk-address">Introduce una dirección</p>
+            <!-- Departamento / Ciudad -->
+            <div class="relative text-left flex flex-col gap-1.5">
+                <label class="text-[8px] font-black uppercase tracking-widest text-gray-400">Departamento</label>
+                <select id="chk-city" onchange="window.updateCheckoutZone(this.value)"
+                        class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs bg-white font-bold focus:border-black outline-none transition-all cursor-pointer">
+                    ${['Beni','Chuquisaca','Cochabamba','La Paz','Oruro','Pando','Potos\u00ed','Santa Cruz','Tarija'].map(dept => `
+                        <option value="${dept}" ${cityVal === dept ? 'selected' : ''}>${dept}</option>
+                    `).join('')}
+                </select>
+                <p class="text-[9px] text-red-500 font-bold mt-1 hidden" id="err-chk-city">Selecciona tu departamento</p>
             </div>
 
-            <!-- Enlace Google Maps (Opcional) -->
-            <div class="flex flex-col gap-1">
-                <div class="relative">
-                    <input type="text" id="chk-maps-link" value="${mapsLinkVal}" placeholder="Enlace de ubicación en Google Maps (opcional)" 
-                           class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium pr-10">
-                    <i class="fa-solid fa-map-location-dot absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+            <!-- Campos de ubicación (Solo visibles si es una zona de cobertura de delivery local) -->
+            <div id="chk-address-fields" class="${isInCoverageZone ? 'space-y-4' : 'hidden space-y-4'}">
+                <!-- Etiqueta de la dirección (solo visible si es nueva) -->
+                <div id="chk-address-label-container" class="relative text-left ${hasAddresses ? 'hidden' : ''}">
+                    <input type="text" id="chk-address-label" placeholder="Nombre de la ubicación (Ej: CASA, OFICINA)" 
+                           class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium uppercase">
                 </div>
-                <p class="text-[8px] text-gray-400 font-bold px-1 text-left">Tip: Abre Google Maps, mantén presionado tu casa, copia el enlace y pégalo aquí.</p>
-            </div>
 
-            <!-- Descripción de Puerta / Fachada -->
-            <div class="relative">
-                <input type="text" id="chk-door-desc" value="${doorDescVal}" placeholder="Descripción de tu fachada o puerta (ej. rejas blancas, puerta de metal negra, etc. - opcional)" 
-                       class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
-            </div>
-
-            <!-- Apartamento/Suite y Departamento -->
-            <div class="grid grid-cols-2 gap-3">
-                <input type="text" id="chk-apartment" value="${apartmentVal}" placeholder="Casa, departamento, piso, etc. (opcional)" 
-                       class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
-                
-                <div class="relative text-left">
-                    <select id="chk-city" onchange="window.updateCheckoutZone(this.value)"
-                            class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs bg-white font-bold focus:border-black outline-none transition-all cursor-pointer">
-                        ${['Beni','Chuquisaca','Cochabamba','La Paz','Oruro','Pando','Poto\u00eds\u00ed','Santa Cruz','Tarija'].map(dept => `
-                            <option value="${dept}" ${cityVal === dept ? 'selected' : ''}>${dept}</option>
-                        `).join('')}
+                <!-- País -->
+                <div class="flex flex-col gap-1.5 text-left">
+                    <label class="text-[8px] font-black uppercase tracking-widest text-gray-400">País / Región</label>
+                    <select id="chk-country" class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs bg-gray-50 font-bold focus:border-black outline-none transition-all">
+                        <option value="Bolivia">Bolivia</option>
                     </select>
-                    <p class="text-[9px] text-red-500 font-bold mt-1 hidden" id="err-chk-city">Selecciona tu departamento</p>
+                </div>
+
+                <!-- Dirección -->
+                <div class="relative text-left">
+                    <input type="text" id="chk-address" value="${addressVal}" placeholder="Dirección (Calle, avenida, Nro.)" 
+                           class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
+                    <p class="text-[9px] text-red-500 font-bold mt-1 hidden" id="err-chk-address">Introduce una dirección</p>
+                </div>
+
+                <!-- Enlace Google Maps (Opcional) -->
+                <div class="flex flex-col gap-1">
+                    <div class="relative">
+                        <input type="text" id="chk-maps-link" value="${mapsLinkVal}" placeholder="Enlace de ubicación en Google Maps (opcional)" 
+                               class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium pr-10">
+                        <i class="fa-solid fa-map-location-dot absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
+                    </div>
+                    <p class="text-[8px] text-gray-400 font-bold px-1 text-left">Tip: Abre Google Maps, mantén presionado tu casa, copia el enlace y pégalo aquí.</p>
+                </div>
+
+                <!-- Descripción de Puerta / Fachada -->
+                <div class="relative">
+                    <input type="text" id="chk-door-desc" value="${doorDescVal}" placeholder="Descripción de tu fachada o puerta (ej. rejas blancas, puerta de metal negra, etc. - opcional)" 
+                           class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
+                </div>
+
+                <!-- Apartamento/Suite -->
+                <div class="relative">
+                    <input type="text" id="chk-apartment" value="${apartmentVal}" placeholder="Casa, departamento, piso, etc. (opcional)" 
+                           class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
                 </div>
             </div>
 
@@ -2858,21 +2861,7 @@ function renderCheckout(container) {
             </div>
         </div>
 
-        <!-- Dirección de Facturación -->
-        <div class="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4 text-left">
-            <h2 class="text-xs font-black uppercase tracking-wider text-black">Dirección de facturación</h2>
-            
-            <div class="space-y-3">
-                <label class="flex items-center gap-3 p-4 border border-gray-200 rounded-2xl cursor-pointer hover:border-black transition-all select-none bg-gray-50/10">
-                    <input type="radio" name="billing-option" id="bill-same" value="same" checked class="text-black focus:ring-black w-4 h-4">
-                    <span class="text-xs font-black text-black">La misma dirección de envío</span>
-                </label>
-                <label class="flex items-center gap-3 p-4 border border-gray-200 rounded-2xl cursor-pointer hover:border-black transition-all select-none">
-                    <input type="radio" name="billing-option" id="bill-different" value="different" class="text-black focus:ring-black w-4 h-4">
-                    <span class="text-xs font-black text-black">Usar una dirección de facturación distinta</span>
-                </label>
-            </div>
-        </div>
+
 
         <!-- Botones en Mobile -->
         <div class="block lg:hidden pt-4 space-y-3">
@@ -2887,7 +2876,7 @@ function renderCheckout(container) {
     </div>
 
     <!-- Columna Derecha: Resumen de Compra -->
-    <div class="lg:w-5/12 mt-8 lg:mt-0">
+    <div class="w-full lg:w-5/12 mt-8 lg:mt-0 order-1 lg:order-2">
         <div class="bg-gray-50/70 p-6 md:p-8 rounded-[2rem] border border-gray-150 sticky top-36 space-y-6">
             <h2 class="text-xs font-black uppercase tracking-wider text-black pb-3 border-b border-gray-200 text-left">Resumen del pedido</h2>
             
@@ -2920,7 +2909,7 @@ function renderCheckout(container) {
                 <!-- Envío -->
                 <div class="flex justify-between items-center text-xs font-bold text-gray-500">
                     <span>Envío</span>
-                    <span class="text-black font-black text-right" id="checkout-shipping-fee-text">BOB ${shippingCost.toFixed(2)}</span>
+                    <span class="text-black font-black text-right" id="checkout-shipping-fee-text">${isInCoverageZone ? `BOB ${shippingCost.toFixed(2)}` : 'Por coordinar'}</span>
                 </div>
                 
                 <!-- Impuestos -->
@@ -2964,7 +2953,19 @@ function renderCheckout(container) {
         // Actualizar visualmente los precios en el DOM
         const shipText = document.getElementById('checkout-shipping-fee-text');
         const totalText = document.getElementById('checkout-total-text');
-        if (shipText) shipText.innerText = cost === 0 ? "Gratis" : `BOB ${cost.toFixed(2)}`;
+        const citySelect = document.getElementById('chk-city');
+        const userCity = citySelect ? citySelect.value : (state.selectedDepartment || 'Cochabamba');
+        const deliveryZones = (state.storeConfig && state.storeConfig.delivery_zones) || ['Cochabamba'];
+        const isCurrentInCoverage = deliveryZones.some(z =>
+            userCity.toLowerCase().includes(z.toLowerCase()) || z.toLowerCase().includes(userCity.toLowerCase())
+        );
+        if (shipText) {
+            if (!isCurrentInCoverage) {
+                shipText.innerText = "Por coordinar";
+            } else {
+                shipText.innerText = cost === 0 ? "Gratis" : `BOB ${cost.toFixed(2)}`;
+            }
+        }
         if (totalText) totalText.innerText = `BOB ${total.toFixed(2)}`;
         
         // Estilizar las tarjetas de selección
@@ -3027,27 +3028,45 @@ function renderCheckout(container) {
 
         // Actualizar el costo base (seleccionando la primera opción activa o carrier)
         const opts = state.storeConfig.shipping_options || [];
-        const carrierCost = (state.storeConfig && state.storeConfig.carrier_cost) || 25;
+        const carrierCost = 0;
         let newCost = carrierCost;
         if (isInCoverageZone && opts.length > 0) {
             newCost = opts[0].price;
         }
         window.updateCheckoutShipping(newCost);
+
+        // Mostrar u ocultar campos de dirección según cobertura
+        const addressFields = document.getElementById('chk-address-fields');
+        if (addressFields) {
+            if (isInCoverageZone) {
+                addressFields.classList.remove('hidden');
+                addressFields.classList.add('space-y-4');
+            } else {
+                addressFields.classList.add('hidden');
+                addressFields.classList.remove('space-y-4');
+            }
+        }
+
+        // Limpiar errores visuales de campos que ahora son opcionales y ocultos
+        if (!isInCoverageZone) {
+            document.getElementById('err-chk-last-name')?.classList.add('hidden');
+            document.getElementById('chk-last-name')?.classList.remove('border-red-500');
+            document.getElementById('err-chk-address')?.classList.add('hidden');
+            document.getElementById('chk-address')?.classList.remove('border-red-500');
+        }
     };
 
     function renderCheckoutShippingHTML(inZone, options, zones) {
         if (!inZone) {
-            const carrierCost = (state.storeConfig && state.storeConfig.carrier_cost) || 25;
             return `
-            <div class="border border-gray-200 rounded-2xl p-4 flex items-start gap-3">
+            <div class="border border-gray-200 rounded-2xl p-4 flex items-start gap-3 text-left">
                 <div class="w-8 h-8 bg-gray-50 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
                     <i class="fa-solid fa-truck text-black text-sm"></i>
                 </div>
                 <div>
                     <p class="text-xs font-black text-black uppercase tracking-wide">Envío por Transportadora <span class="text-red-500">*</span></p>
                     <p class="text-[10px] text-gray-500 font-medium mt-0.5 leading-relaxed">
-                        Tu departamento no tiene cobertura de delivery local. El pedido se envía a través de una transportadora y el costo adicional se te informará internamente por WhatsApp.<br>
-                        <span class="font-black mt-1 block text-black">Cargo base referencial: BOB ${carrierCost.toFixed(2)}</span>
+                        Tu departamento no tiene cobertura de delivery local. El pedido se enviará por medio de una transportadora (encomienda) y el costo del envío se coordinará e informará internamente por WhatsApp.
                     </p>
                 </div>
             </div>
@@ -3069,7 +3088,7 @@ function renderCheckout(container) {
                 ${options.map((opt, idx) => `
                 <label class="flex items-center justify-between p-4 border ${idx === 0 ? 'border-black bg-gray-50/10' : 'border-gray-200'} rounded-2xl cursor-pointer hover:border-black transition-all select-none text-left lbl-ship-option" data-price="${opt.price}">
                     <div class="flex items-center gap-3">
-                        <input type="radio" name="shipping-method" id="ship-opt-${opt.id}" ${idx === 0 ? 'id="ship-express"' : ''} value="${opt.title}" ${idx === 0 ? 'checked' : ''} 
+                        <input type="radio" name="shipping-method" id="${idx === 0 ? 'ship-express' : 'ship-opt-' + opt.id}" value="${opt.title}" ${idx === 0 ? 'checked' : ''} 
                                class="text-black focus:ring-black w-4 h-4" onchange="window.updateCheckoutShipping(${opt.price}, this)">
                         <div class="flex flex-col">
                             <span class="text-xs font-black text-black">${opt.title}</span>
@@ -3125,6 +3144,7 @@ function renderCheckout(container) {
     }
 
     window.submitCheckoutForm = async () => {
+      try {
         // Campos
         const email = document.getElementById('chk-email').value.trim();
         const phone = document.getElementById('chk-phone').value.trim();
@@ -3135,12 +3155,33 @@ function renderCheckout(container) {
         const doorDesc = document.getElementById('chk-door-desc').value.trim();
         const apartment = document.getElementById('chk-apartment').value.trim();
         const city = document.getElementById('chk-city').value.trim();
-        const isExpress = document.getElementById('ship-express').checked;
+        const shipExpressEl = document.getElementById('ship-express');
+        const isExpress = shipExpressEl ? shipExpressEl.checked : false;
+        // Get the selected shipping method name
+        const selectedShipRadio = document.querySelector('input[name="shipping-method"]:checked');
+        const selectedShipMethodName = selectedShipRadio ? selectedShipRadio.value : (isExpress ? 'Envío Express' : 'Transportadora');
         
+        // Determinar si la zona actual tiene cobertura para validación condicional
+        const currentCity = city;
+        const currentDeliveryZones = (state.storeConfig && state.storeConfig.delivery_zones) || ['Cochabamba'];
+        const currentInCoverage = currentDeliveryZones.some(z =>
+            currentCity.toLowerCase().includes(z.toLowerCase()) || z.toLowerCase().includes(currentCity.toLowerCase())
+        );
+
         // Validación
         let isValid = true;
         
-        // Correo
+        // Nombre (siempre obligatorio)
+        if (!firstName) {
+            document.getElementById('err-chk-first-name').classList.remove('hidden');
+            document.getElementById('chk-first-name').classList.add('border-red-500');
+            isValid = false;
+        } else {
+            document.getElementById('err-chk-first-name').classList.add('hidden');
+            document.getElementById('chk-first-name').classList.remove('border-red-500');
+        }
+        
+        // Correo (siempre obligatorio)
         if (!email || !email.includes('@')) {
             document.getElementById('err-chk-email').classList.remove('hidden');
             document.getElementById('chk-email').classList.add('border-red-500');
@@ -3150,7 +3191,7 @@ function renderCheckout(container) {
             document.getElementById('chk-email').classList.remove('border-red-500');
         }
 
-        // Celular
+        // Celular (siempre obligatorio)
         if (!phone) {
             document.getElementById('err-chk-phone').classList.remove('hidden');
             document.getElementById('chk-phone').classList.add('border-red-500');
@@ -3160,8 +3201,8 @@ function renderCheckout(container) {
             document.getElementById('chk-phone').classList.remove('border-red-500');
         }
         
-        // Apellido
-        if (!lastName) {
+        // Apellido (obligatorio solo en zona de cobertura)
+        if (currentInCoverage && !lastName) {
             document.getElementById('err-chk-last-name').classList.remove('hidden');
             document.getElementById('chk-last-name').classList.add('border-red-500');
             isValid = false;
@@ -3170,8 +3211,8 @@ function renderCheckout(container) {
             document.getElementById('chk-last-name').classList.remove('border-red-500');
         }
         
-        // Dirección
-        if (!address) {
+        // Dirección (obligatoria solo en zona de cobertura)
+        if (currentInCoverage && !address) {
             document.getElementById('err-chk-address').classList.remove('hidden');
             document.getElementById('chk-address').classList.add('border-red-500');
             isValid = false;
@@ -3180,7 +3221,7 @@ function renderCheckout(container) {
             document.getElementById('chk-address').classList.remove('border-red-500');
         }
         
-        // Ciudad
+        // Ciudad (siempre obligatorio)
         if (!city) {
             document.getElementById('err-chk-city').classList.remove('hidden');
             document.getElementById('chk-city').classList.add('border-red-500');
@@ -3290,7 +3331,7 @@ function renderCheckout(container) {
         const seller = state.contacts.find(c => c.id == wins[Math.floor(Math.random() * wins.length)]) || state.contacts[0] || { name: 'Ventas', number: '' };
         
         // Formatear mensaje para WhatsApp
-        const shippingFeeText = isExpress ? 15.00 : 0.00;
+        const shippingFeeText = shippingCost;
         const totalCost = subtotal + shippingFeeText;
         
         let m = "✨ *EMMA STORE - NUEVO PEDIDO* ✨\n";
@@ -3303,20 +3344,27 @@ function renderCheckout(container) {
         
         m += "📍 *ENTREGA Y DIRECCIÓN:*\n";
         m += `   └─ Ciudad/Depto: ${city}\n`;
-        m += `   └─ Dirección: ${address}\n`;
-        if (apartment) {
-            m += `   └─ Detalle/Piso: ${apartment}\n`;
-        }
-        if (doorDesc) {
-            m += `   └─ Fachada/Puerta: ${doorDesc}\n`;
-        }
-        if (mapsLink) {
-            m += `   └─ Google Maps: ${mapsLink}\n`;
+        if (currentInCoverage) {
+            m += `   └─ Dirección: ${address}\n`;
+            if (apartment) {
+                m += `   └─ Detalle/Piso: ${apartment}\n`;
+            }
+            if (doorDesc) {
+                m += `   └─ Fachada/Puerta: ${doorDesc}\n`;
+            }
+            if (mapsLink) {
+                m += `   └─ Google Maps: ${mapsLink}\n`;
+            }
+        } else {
+            m += `   └─ *Envío a provincia / exterior de sucursal*\n`;
         }
         m += "\n";
         
+        const shippingFeeDisplay = currentInCoverage ? `BOB ${shippingFeeText.toFixed(2)}` : '*Por coordinar*';
+        const totalDisplay = currentInCoverage ? `BOB ${totalCost.toFixed(2)}` : `BOB ${subtotal.toFixed(2)} + envío por coordinar`;
+        
         m += "🚚 *MÉTODO DE ENVÍO:*\n";
-        m += isExpress ? "   └─ Envío Delivery Express (BOB 15.00)\n\n" : "   └─ Envío Gratis (Punto de Encuentro)\n\n";
+        m += `   └─ ${selectedShipMethodName} (${shippingFeeDisplay})\n\n`;
         
         m += "🛍️ *PRODUCTOS DEL PEDIDO:*\n";
         state.cart.forEach(item => {
@@ -3326,10 +3374,13 @@ function renderCheckout(container) {
         
         m += "━━━━━━━━━━━━━━━━━━━━━\n";
         m += `💵 Subtotal: BOB ${subtotal.toFixed(2)}\n`;
-        m += `🚚 Envío: BOB ${shippingFeeText.toFixed(2)}\n`;
-        m += `💰 *TOTAL A PAGAR: BOB ${totalCost.toFixed(2)}*\n`;
+        m += `🚚 Envío: ${shippingFeeDisplay}\n`;
+        m += `💰 *TOTAL A PAGAR: ${totalDisplay}*\n`;
         m += "━━━━━━━━━━━━━━━━━━━━━\n\n";
-        m += "💵 *Método de Pago:* Pago contra entrega\n";
+        m += `💵 *Método de Pago:* ${currentInCoverage ? 'Pago contra entrega' : '⚠️ *Transferencia Bancaria / QR (Previo Pago)*'}\n`;
+        if (!currentInCoverage) {
+            m += "\n⚠️ *NOTA:* El costo de envío por encomienda está *Pendiente de Coordinación* y se te informará para realizar el pago correspondiente antes del despacho.";
+        }
         
         // Mostrar spinner/bloqueo de botón opcional aquí (asumiremos rápido para UX local)
         
@@ -3350,7 +3401,7 @@ function renderCheckout(container) {
                         subtotal: subtotal,
                         shipping_cost: shippingFeeText,
                         total: totalCost,
-                        shipping_method: isExpress ? 'express' : 'free',
+                        shipping_method: selectedShipMethodName || (isExpress ? 'express' : 'free'),
                         contact_name: `${firstName} ${lastName}`.trim(),
                         contact_email: email,
                         contact_phone: phone,
@@ -3395,7 +3446,7 @@ function renderCheckout(container) {
                             subtotal: subtotal,
                             shipping_cost: shippingFeeText,
                             total: totalCost,
-                            shipping_method: isExpress ? 'express' : 'free',
+                            shipping_method: selectedShipMethodName || (isExpress ? 'express' : 'free'),
                             shipping_address: address,
                             shipping_city: city,
                             shipping_department: state.selectedDepartment,
@@ -3451,6 +3502,18 @@ function renderCheckout(container) {
         const waUrl = sellerPhone ? `https://wa.me/${sellerPhone}?text=${encodeURIComponent(m)}` : '#';
         
         renderCheckoutSuccess(orderNumber, waUrl, newOrder.items);
+      } catch (globalErr) {
+        console.error('Error crítico en submitCheckoutForm:', globalErr);
+        showNotification('Error al procesar tu pedido: ' + globalErr.message);
+        const loader = document.getElementById('global-checkout-loader');
+        if (loader) loader.remove();
+        const allBtns = document.querySelectorAll('button[onclick="window.submitCheckoutForm()"]');
+        allBtns.forEach(btn => {
+            btn.innerHTML = 'Finalizar el pedido';
+            btn.disabled = false;
+            btn.classList.remove('opacity-70', 'cursor-not-allowed');
+        });
+      }
     };
 }
 
@@ -3495,28 +3558,161 @@ function renderCheckoutSuccess(orderNumber, waUrl, items = []) {
             </button>
             
             ${waUrl !== '#' ? `
-            <a href="${waUrl}" target="_blank" rel="noopener noreferrer" class="mt-6 text-[10px] font-bold text-gray-400 hover:text-green-500 transition-colors uppercase tracking-widest flex items-center justify-center gap-2">
-                <i class="fa-brands fa-whatsapp text-sm"></i> Opcional: Escríbenos por WhatsApp
-            </a>
+            <button onclick="window.openWhatsAppRedirect()" class="mt-6 text-[10px] font-bold text-gray-400 hover:text-green-500 transition-colors uppercase tracking-widest flex items-center justify-center gap-2 bg-transparent border-none cursor-pointer">
+                <i class="fa-brands fa-whatsapp text-sm"></i> Escríbenos por WhatsApp
+            </button>
             ` : ''}
         </div>
     </div>`;
+
+    // Modal de redirección automática
+    if (waUrl !== '#') {
+        const modalId = 'wa-redirect-modal';
+        let modal = document.getElementById(modalId);
+        if (modal) modal.remove();
+
+        modal = document.createElement('div');
+        modal.id = modalId;
+        modal.className = 'fixed inset-0 z-[150] flex items-center justify-center p-4 transition-all duration-300 opacity-0 pointer-events-none';
+        modal.innerHTML = `
+            <div class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300"></div>
+            <div class="relative bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl scale-95 transition-transform duration-300 border border-gray-100 flex flex-col text-center" id="wa-redirect-card">
+                
+                <div class="w-16 h-16 bg-green-50 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm text-green-500">
+                    <i class="fa-brands fa-whatsapp text-3xl"></i>
+                </div>
+                
+                <h3 class="text-xs font-black uppercase tracking-wider text-black mb-3">Redirigir a WhatsApp</h3>
+                
+                <p class="text-xs font-bold text-gray-500 uppercase tracking-widest leading-relaxed mb-6">
+                    Tu pedido ha sido registrado.<br>
+                    Haz clic en <span class="text-black font-black">Continuar</span> para enviar el detalle del pedido a nuestro WhatsApp y coordinar la entrega.
+                </p>
+                
+                <div class="flex gap-3">
+                    <button id="wa-redirect-cancel" class="flex-1 border-2 border-gray-200 bg-white text-gray-400 py-3.5 rounded-2xl font-black text-[10px] tracking-widest uppercase hover:bg-gray-50 transition-all cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button id="wa-redirect-confirm" class="flex-1 bg-green-500 hover:bg-green-600 text-white py-3.5 rounded-2xl font-black text-[10px] tracking-widest uppercase transition-all shadow-lg active:scale-95 cursor-pointer">
+                        Continuar
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Animación de entrada
+        requestAnimationFrame(() => {
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            const card = document.getElementById('wa-redirect-card');
+            if (card) {
+                card.classList.remove('scale-95');
+                card.classList.add('scale-100');
+            }
+        });
+
+        const closeModal = () => {
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            const card = document.getElementById('wa-redirect-card');
+            if (card) {
+                card.classList.remove('scale-100');
+                card.classList.add('scale-95');
+            }
+            setTimeout(() => modal.remove(), 300);
+        };
+
+        // Guardar la función global para abrir el modal si cierran y quieren volver a abrir
+        window.openWhatsAppRedirect = () => {
+            renderCheckoutSuccess(orderNumber, waUrl, items);
+        };
+
+        document.getElementById('wa-redirect-cancel').onclick = () => {
+            closeModal();
+        };
+
+        document.getElementById('wa-redirect-confirm').onclick = () => {
+            closeModal();
+            window.open(waUrl, '_blank');
+        };
+    }
 }
 
 window.askInfo = (id) => {
-    // GANCHO DE AUTENTICACIÓN (permitir visitantes)
-    if (!state.user && !state.isGuest) {
-        window.openLoginHookModal(() => window.askInfo(id));
-        return;
-    }
-
     const p = state.products.find(x => x.id === id);
-    const v = state.contacts.find(x => x.id == p.contactId) || state.contacts[0];
-    const customerName = state.user ? state.user.name : 'Visitante';
-    const msg = p.whatsappCustomMsg || `Hola Emma Store!\n\nInteresada en: ${p.name}\nPrecio: BS ${p.price}\n\n👤 Cliente: ${customerName}\n📍 Departamento: ${state.selectedDepartment}`;
-    if (confirm("¿Consultar stock?")) {
-        window.location.href = `https://wa.me/${v.number.toString().replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
-    }
+    if (!p) return;
+
+    // Crear el modal dinámicamente
+    const modalId = 'quick-order-confirm-modal';
+    let modal = document.getElementById(modalId);
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = modalId;
+    modal.className = 'fixed inset-0 z-[150] flex items-center justify-center p-4 transition-all duration-300 opacity-0 pointer-events-none';
+    modal.innerHTML = `
+        <div class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300"></div>
+        <div class="relative bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl scale-95 transition-transform duration-300 border border-gray-100 flex flex-col text-center" id="quick-order-card">
+            
+            <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm text-blue-600">
+                <i class="fa-solid fa-bolt text-2xl"></i>
+            </div>
+            
+            <h3 class="text-xs font-black uppercase tracking-wider text-black mb-3">Pedido Rápido</h3>
+            
+            <p class="text-xs font-bold text-gray-500 uppercase tracking-widest leading-relaxed mb-6">
+                El precio del producto es <span class="text-black font-black">BOB ${p.price.toFixed(2)}</span>.<br>
+                ¿Quieres continuar rellenando los datos?
+            </p>
+            
+            <div class="flex gap-3">
+                <button id="quick-order-cancel" class="flex-1 border-2 border-gray-200 bg-white text-gray-400 py-3.5 rounded-2xl font-black text-[10px] tracking-widest uppercase hover:bg-gray-50 transition-all cursor-pointer">
+                    Cancelar
+                </button>
+                <button id="quick-order-confirm" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-2xl font-black text-[10px] tracking-widest uppercase transition-all shadow-lg active:scale-95 cursor-pointer">
+                    Continuar
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Animación de entrada
+    requestAnimationFrame(() => {
+        modal.classList.remove('opacity-0', 'pointer-events-none');
+        const card = document.getElementById('quick-order-card');
+        if (card) {
+            card.classList.remove('scale-95');
+            card.classList.add('scale-100');
+        }
+    });
+
+    const closeModal = () => {
+        modal.classList.add('opacity-0', 'pointer-events-none');
+        const card = document.getElementById('quick-order-card');
+        if (card) {
+            card.classList.remove('scale-100');
+            card.classList.add('scale-95');
+        }
+        setTimeout(() => modal.remove(), 300);
+    };
+
+    // Eventos
+    document.getElementById('quick-order-cancel').onclick = () => {
+        closeModal();
+    };
+
+    document.getElementById('quick-order-confirm').onclick = () => {
+        closeModal();
+        const inCart = state.cart.find(x => x.id == id);
+        if (!inCart) {
+            state.cart.push({ ...p, quantity: 1 });
+            updateCartUI();
+        }
+        window.toggleCart(false);
+        window.checkout();
+    };
 };
 
 // --- ATAJOS TECLADO ---
