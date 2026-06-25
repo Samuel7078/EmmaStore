@@ -9,7 +9,7 @@ const state = {
     products: [],
     categories: [],
     contacts: [],
-    stories: [],
+    promotions: [],
     cart: JSON.parse(localStorage.getItem('emma_store_cart')) || [],
     selectedCategory: 'todas',
     selectedProduct: null,
@@ -17,9 +17,6 @@ const state = {
     detailSlideInterval: null,
     userInteractionTimeout: null,
     searchQuery: '',
-    // Estado para Historias
-    activeStoryIndex: -1,
-    storyTimer: null,
     // Google Auth & Ubicación de Departamento
     user: null,
     supabaseSession: null,
@@ -47,6 +44,14 @@ const state = {
     }
 };
 
+// Migrate old numeric IDs in cart to string prefixes to avoid promotions collisions
+state.cart = state.cart.map(item => {
+    if (typeof item.id === 'number') {
+        item.id = `prod_${item.id}`;
+    }
+    return item;
+});
+
 // --- HELPER: Auth Token para API ---
 function getAuthHeaders() {
     if (!state.supabaseSession) return {};
@@ -61,7 +66,7 @@ async function loadData() {
             fetch('/api/products').then(r => r.json()),
             fetch('/api/categories').then(r => r.json()),
             fetch('/api/contacts').then(r => r.json()),
-            fetch('/api/stories').then(r => r.json()),
+            fetch('/api/promotions').then(r => r.json()),
             fetch('/api/store-config').then(r => r.json()).catch(() => ({ shipping_cost: 15, carrier_cost: 25, delivery_zones: ['Cochabamba'] }))
         ]);
         if (storeConf && !storeConf.error) {
@@ -79,7 +84,7 @@ async function loadData() {
         }));
         state.categories = cat;
         state.contacts = con;
-        state.stories = s;
+        state.promotions = s;
 
         // Selección estable de categoría y producto aleatorio para la landing page
         if (state.categories.length > 0) {
@@ -174,100 +179,33 @@ async function loadData() {
     }
 }
 
-// --- VISOR DE HISTORIAS (ESTILO INSTAGRAM) ---
-window.openStory = (index) => {
-    state.activeStoryIndex = index;
-    const story = state.stories[index];
-    if (!story) return;
-
-    let viewer = document.getElementById('story-viewer');
-    if (!viewer) {
-        viewer = document.createElement('div');
-        viewer.id = 'story-viewer';
-        viewer.className = "fixed inset-0 z-[3000] bg-black flex items-center justify-center animate-fade";
-        viewer.innerHTML = `
-            <div class="absolute top-0 left-0 w-full h-1.5 flex gap-1 p-2 z-10" id="story-progress-container"></div>
-            <button onclick="window.closeStory()" class="absolute top-8 right-6 z-20 text-white text-3xl">&times;</button>
-            
-            <div class="absolute inset-y-0 left-0 w-1/4 z-10 cursor-pointer" onclick="window.prevStory()"></div>
-            <div class="absolute inset-y-0 right-0 w-1/4 z-10 cursor-pointer" onclick="window.nextStory()"></div>
-
-            <div class="relative w-full h-full max-w-lg overflow-hidden flex items-center justify-center">
-                <img id="story-img" class="w-full h-full object-cover">
-                <div class="absolute bottom-10 left-0 w-full p-6 bg-gradient-to-t from-black/80 to-transparent text-white">
-                    <p id="story-vendor" class="text-xs font-black uppercase tracking-widest mb-1"></p>
-                    <p id="story-msg" class="text-[10px] opacity-70"></p>
-                </div>
-            </div>
-        `;
-        document.body.appendChild(viewer);
-    }
+// --- FORMATO CUENTA REGRESIVA DE PROMOCIONES ---
+function formatCountdown(endsAt) {
+    const diff = endsAt - Date.now();
+    if (diff <= 0) return "Vencido";
     
-    viewer.classList.remove('hidden');
-    updateStoryUI();
-};
-
-function updateStoryUI() {
-    const story = state.stories[state.activeStoryIndex];
-    const vendor = state.contacts.find(c => c.id == story.contactId);
-        
-    document.getElementById('story-img').src = story.imageUrl;
-    document.getElementById('story-vendor').innerText = "Emma Store";
-    document.getElementById('story-msg').innerText = story.customMsg || "Novedades exclusivas";
-
-    // Renderizar barras de progreso
-    const progressContainer = document.getElementById('story-progress-container');
-    progressContainer.innerHTML = state.stories.map((_, i) => `
-        <div class="h-full flex-1 bg-white/20 rounded-full overflow-hidden">
-            <div class="h-full bg-white transition-all linear" 
-                 id="bar-${i}" 
-                 style="width: ${i < state.activeStoryIndex ? '100%' : '0%'}">
-            </div>
-        </div>
-    `).join('');
-
-    startStoryTimer();
+    const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    const minutes = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
+    const seconds = Math.floor((diff % (60 * 1000)) / 1000);
+    
+    let parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0 || days > 0) parts.push(`${hours}h`);
+    parts.push(`${minutes}m`);
+    parts.push(`${seconds}s`);
+    
+    return parts.join(' ');
 }
 
-function startStoryTimer() {
-    clearTimeout(state.storyTimer);
-    const currentBar = document.getElementById(`bar-${state.activeStoryIndex}`);
+window.viewPromotion = (promoId) => {
+    const promo = state.promotions.find(p => p.id == promoId);
+    if (!promo) return;
     
-    // Resetear barra actual
-    currentBar.style.transition = 'none';
-    currentBar.style.width = '0%';
+    state.selectedProduct = promo;
+    state.detailActiveImg = 0;
     
-    setTimeout(() => {
-        // Duración de la historia: 5000ms (5 segundos)
-        currentBar.style.transition = 'width 5000ms linear';
-        currentBar.style.width = '100%';
-    }, 50);
-
-    state.storyTimer = setTimeout(() => {
-        window.nextStory();
-    }, 5050);
-}
-
-window.nextStory = () => {
-    if (state.activeStoryIndex < state.stories.length - 1) {
-        state.activeStoryIndex++;
-        updateStoryUI();
-    } else {
-        window.closeStory();
-    }
-};
-
-window.prevStory = () => {
-    if (state.activeStoryIndex > 0) {
-        state.activeStoryIndex--;
-        updateStoryUI();
-    }
-};
-
-window.closeStory = () => {
-    clearTimeout(state.storyTimer);
-    document.getElementById('story-viewer')?.classList.add('hidden');
-    state.activeStoryIndex = -1;
+    window.navigate('detail');
 };
 
 // --- FUNCIONALIDAD LIGHTBOX PRO ---
@@ -418,9 +356,9 @@ function updateCartUI() {
                 <h4 class="text-[10px] font-black uppercase text-black truncate">${i.name}</h4>
                 <div class="flex justify-between items-center mt-3">
                     <div class="flex items-center gap-3 bg-gray-50 px-2.5 py-1.5 rounded-full border">
-                        <button onclick="changeCartQty(${i.id}, -1)" class="text-gray-400 hover:text-black font-bold text-xs">－</button>
+                        <button onclick="changeCartQty('${i.id}', -1)" class="text-gray-400 hover:text-black font-bold text-xs">－</button>
                         <span class="text-[10px] font-black">${i.quantity}</span>
-                        <button onclick="changeCartQty(${i.id}, 1)" class="text-gray-400 hover:text-black font-bold text-xs">＋</button>
+                        <button onclick="changeCartQty('${i.id}', 1)" class="text-gray-400 hover:text-black font-bold text-xs">＋</button>
                     </div>
                     <p class="text-[10px] font-black">BS ${(i.price * i.quantity).toFixed(2)}</p>
                 </div>
@@ -439,9 +377,33 @@ window.changeCartQty = (id, d) => {
 
 window.addToCart = (id, q = null) => {
     const qty = q !== null ? q : 1;
-    const p = state.products.find(x => x.id == id);
-    const e = state.cart.find(x => x.id == id);
-    if (e) e.quantity += qty; else state.cart.push({ ...p, quantity: qty });
+    const isPromo = typeof id === 'string' && id.startsWith('promo_');
+    const isProd = typeof id === 'string' && id.startsWith('prod_');
+    
+    let realId = id;
+    let isPromoItem = isPromo;
+    
+    if (isPromo) {
+        realId = parseInt(id.replace('promo_', ''));
+    } else if (isProd) {
+        realId = parseInt(id.replace('prod_', ''));
+    } else {
+        realId = parseInt(id);
+    }
+    
+    const cartId = isPromoItem ? `promo_${realId}` : `prod_${realId}`;
+    const p = isPromoItem 
+        ? state.promotions.find(x => x.id == realId)
+        : state.products.find(x => x.id == realId);
+        
+    if (!p) return;
+    
+    const e = state.cart.find(x => x.id === cartId);
+    if (e) {
+        e.quantity += qty;
+    } else {
+        state.cart.push({ ...p, id: cartId, quantity: qty });
+    }
     updateCartUI(); toggleCart(true);
 };
 
@@ -1417,6 +1379,14 @@ function render() {
             clearInterval(window.spotlightCarouselInterval);
             window.spotlightCarouselInterval = null;
         }
+        if (window.heroSliderInterval) {
+            clearInterval(window.heroSliderInterval);
+            window.heroSliderInterval = null;
+        }
+        if (window.heroPromoTimerInterval) {
+            clearInterval(window.heroPromoTimerInterval);
+            window.heroPromoTimerInterval = null;
+        }
     }
     
     // Ocultar buscador móvil en vistas secundarias (que no sean home o catalog)
@@ -1431,7 +1401,6 @@ function render() {
 
     if (state.view === 'home') {
         renderHero(main);
-        renderStories(main);
         renderBenefits(main);
         renderRandomProductSpotlight(main);
         renderHowItWorks(main);
@@ -1523,19 +1492,50 @@ window.toggleFaq = function(el) {
 
 // --- VISTAS ESPECÍFICAS ---
 function renderHero(container) {
-    // Obtener imágenes aleatorias de los productos para el carrusel
+    // Filter active promotions
+    const activePromotions = (state.promotions || []).filter(p => p.endsAt > Date.now());
+    
+    // Fallback: standard product slider
     let heroImages = [];
     if (state.products && state.products.length > 0) {
-        // Tomar hasta 5 productos al azar y obtener su primera imagen
         const shuffled = [...state.products].sort(() => 0.5 - Math.random());
         heroImages = shuffled.slice(0, 5).map(p => p.images ? p.images[0] : null).filter(img => img);
     }
-    // Fallback images if no products
     if (heroImages.length === 0) {
         heroImages = [
             "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&q=80&w=800",
             "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=800"
         ];
+    }
+
+    let heroRightHTML = '';
+    if (activePromotions.length > 0) {
+        heroRightHTML = `
+            <div class="hero-image-container shadow-2xl glass-effect p-2 cursor-pointer transition-transform hover:scale-[1.01]" id="hero-promo-slider">
+                <div class="w-full h-full rounded-2xl overflow-hidden relative">
+                    ${activePromotions.map((promo, i) => `
+                        <div class="hero-image absolute inset-0 transition-opacity duration-1000 flex flex-col justify-between ${i === 0 ? 'active' : 'opacity-0'}" onclick="window.viewPromotion(${promo.id})">
+                            <img src="${promo.images[0]}" class="w-full h-full object-cover" alt="${promo.name}">
+                            <!-- Badge of countdown overlay -->
+                            <div class="absolute bottom-4 left-4 bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider flex items-center gap-2 border border-white/15">
+                                <span class="w-2.5 h-2.5 rounded-full bg-red-500 animate-ping"></span>
+                                <span>PROMO: Vence en <span class="promo-timer" data-ends="${promo.endsAt}">${formatCountdown(promo.endsAt)}</span></span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    } else {
+        heroRightHTML = `
+            <div class="hero-image-container shadow-2xl glass-effect p-2">
+                <div class="w-full h-full rounded-2xl overflow-hidden relative" id="hero-image-slider">
+                    ${heroImages.map((img, i) => `
+                        <img src="${img}" class="hero-image ${i === 0 ? 'active' : ''}" alt="Tech Image ${i}">
+                    `).join('')}
+                </div>
+            </div>
+        `;
     }
 
     const heroDiv = document.createElement('div');
@@ -1590,15 +1590,9 @@ function renderHero(container) {
                 </div>
             </div>
 
-            <!-- Columna Derecha: Imagen Dinámica -->
+            <!-- Columna Derecha: Imagen o Promoción -->
             <div class="w-full lg:w-1/2 h-[300px] sm:h-[400px] lg:h-[500px] reveal-up" style="transition-delay: 0.2s">
-                <div class="hero-image-container shadow-2xl glass-effect p-2">
-                    <div class="w-full h-full rounded-2xl overflow-hidden relative" id="hero-image-slider">
-                        ${heroImages.map((img, i) => `
-                            <img src="${img}" class="hero-image ${i === 0 ? 'active' : ''}" alt="Tech Image ${i}">
-                        `).join('')}
-                    </div>
-                </div>
+                ${heroRightHTML}
             </div>
             
         </div>
@@ -1628,8 +1622,23 @@ function renderHero(container) {
 
     container.appendChild(heroDiv);
 
-    // Inicializar carrusel del hero si hay más de 1 imagen
-    if (heroImages.length > 1) {
+    // Inicializar carruseles
+    if (activePromotions.length > 1) {
+        let currentPromo = 0;
+        const images = heroDiv.querySelectorAll('.hero-image');
+        clearInterval(window.heroSliderInterval);
+        window.heroSliderInterval = setInterval(() => {
+            if (!document.getElementById('hero-promo-slider')) {
+                clearInterval(window.heroSliderInterval);
+                return;
+            }
+            images[currentPromo].classList.remove('active');
+            images[currentPromo].classList.add('opacity-0');
+            currentPromo = (currentPromo + 1) % images.length;
+            images[currentPromo].classList.add('active');
+            images[currentPromo].classList.remove('opacity-0');
+        }, 5000);
+    } else if (activePromotions.length === 0 && heroImages.length > 1) {
         let currentImg = 0;
         const images = heroDiv.querySelectorAll('.hero-image');
         clearInterval(window.heroSliderInterval);
@@ -1642,6 +1651,22 @@ function renderHero(container) {
             currentImg = (currentImg + 1) % images.length;
             images[currentImg].classList.add('active');
         }, 5000);
+    }
+
+    // Dynamic timer countdown update on hero
+    clearInterval(window.heroPromoTimerInterval);
+    if (activePromotions.length > 0) {
+        window.heroPromoTimerInterval = setInterval(() => {
+            const timers = document.querySelectorAll('.promo-timer');
+            if (timers.length === 0) {
+                clearInterval(window.heroPromoTimerInterval);
+                return;
+            }
+            timers.forEach(t => {
+                const endsAt = parseInt(t.getAttribute('data-ends'));
+                t.innerText = formatCountdown(endsAt);
+            });
+        }, 1000);
     }
 }
 
@@ -1916,19 +1941,7 @@ function renderFAQ(container) {
     initRevealAnimations();
 }
 
-function renderStories(container) {
-    const div = document.createElement('div');
-    div.className = "max-w-7xl mx-auto px-6 py-6 flex gap-6 overflow-x-auto no-scrollbar animate-fade overscroll-x-contain scroll-smooth";
-    div.innerHTML = state.stories.map((s, index) => `
-        <div class="flex-shrink-0 text-center cursor-pointer group" onclick="window.openStory(${index})">
-            <div class="w-16 h-16 rounded-full p-[2px] story-ring transition-transform duration-300 active:scale-95 group-hover:scale-105">
-                <img src="${s.imageUrl}" class="w-full h-full object-cover rounded-full">
-            </div>
-            <p class="text-[8px] font-black uppercase mt-2 opacity-50 tracking-wider text-black">Ver</p>
-        </div>
-    `).join('');
-    if (state.stories.length > 0) container.appendChild(div);
-}
+
 
 function renderRandomCategoryCarousel(container) {
     if (!state.randomCategoryId) return;
@@ -2413,6 +2426,10 @@ function renderCatalog(container) {
 
 function renderDetail(container) {
     const p = state.selectedProduct;
+    // Clear any active countdown timers
+    clearInterval(window.promoCountdownInterval);
+
+    const isPromo = p.hasOwnProperty('endsAt');
     const cat = state.categories.find(c => c.id == p.categoryId);
     const categoryLabel = cat ? cat.name.toUpperCase() : 'COLECCIÓN';
     const isOutOfStock = p.inStock === false;
@@ -2434,6 +2451,36 @@ function renderDetail(container) {
         </p>
     `;
 
+    let promoCountdownHTML = '';
+    if (isPromo) {
+        const dateStr = new Date(p.endsAt).toLocaleString('es-BO', { 
+            weekday: 'long', 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric', 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+        
+        promoCountdownHTML = `
+            <div class="mb-6 bg-red-950/40 p-5 rounded-2xl border border-red-500/20 text-left">
+                <div class="flex items-center gap-2 mb-2 text-red-400">
+                    <span class="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                    <h4 class="text-[9px] font-black uppercase tracking-widest">Promoción Especial</h4>
+                </div>
+                <p class="text-xl md:text-2xl font-black text-white" id="promo-detail-countdown" data-ends="${p.endsAt}">
+                    Vence en: ${formatCountdown(p.endsAt)}
+                </p>
+                <p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-1.5">
+                    Vence el: ${dateStr}
+                </p>
+            </div>
+        `;
+    }
+
+    // Determine target ID string
+    const promoIdStr = isPromo ? `promo_${p.id}` : `prod_${p.id}`;
+
     container.innerHTML = `
     <div class="max-w-7xl mx-auto px-6 py-8 md:py-16 bg-black text-white rounded-[2rem] md:rounded-[3rem] shadow-2xl border border-white/5 relative overflow-hidden animate-fade mt-6">
         <div class="absolute -left-20 -bottom-20 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
@@ -2448,7 +2495,7 @@ function renderDetail(container) {
                             class="md:hidden absolute top-4 left-4 z-10 w-10 h-10 bg-black/80 backdrop-blur-md text-white rounded-full flex items-center justify-center shadow-md active:scale-90 transition-all border border-white/10">
                         <i class="fa-solid fa-chevron-left text-sm"></i>
                     </button>
-
+                    
                     <img id="detail-main-img" src="${p.images[state.detailActiveImg]}" class="w-full h-full object-cover transition-all duration-500 group-hover:scale-105">
                     
                     <div class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/70 backdrop-blur-md text-white px-5 py-2.5 rounded-full text-[9px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity shadow-xl border border-white/10">
@@ -2474,8 +2521,10 @@ function renderDetail(container) {
                 </div>
                 
                 <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter mb-4 text-white leading-none py-1">${p.name}</h1>
-                <p class="text-2xl md:text-4xl font-black mb-6 text-white">BS ${p.price}</p>
+                <p class="text-2xl md:text-4xl font-black mb-6 text-white font-serif tracking-tight">BS ${p.price}</p>
                 
+                ${promoCountdownHTML}
+
                 <div class="mb-6 md:mb-8 bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10">
                     <h4 class="text-[10px] font-black uppercase tracking-widest text-white/50 mb-4 flex items-center gap-2">
                         <i class="fa-solid fa-circle-info"></i> Detalles del producto
@@ -2489,11 +2538,11 @@ function renderDetail(container) {
                             Agotado temporalmente
                         </button>
                     ` : `
-                        <button onclick="addToCart(${p.id})" class="btn-premium bg-white text-black py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border-none cursor-pointer">
+                        <button onclick="addToCart('${promoIdStr}')" class="btn-premium bg-white text-black py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border-none cursor-pointer">
                             <i class="fa-solid fa-bag-shopping"></i> Añadir a la bolsa
                         </button>
                     `}
-                    <button onclick="askInfo(${p.id})" class="btn-premium bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border-none cursor-pointer">
+                    <button onclick="askInfo('${promoIdStr}')" class="btn-premium bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border-none cursor-pointer">
                         <i class="fa-solid fa-bolt text-sm"></i> Realizar pedido
                     </button>
                 </div>
@@ -2505,6 +2554,25 @@ function renderDetail(container) {
             
         </div>
     </div>`;
+
+    // Active promo countdown interval
+    if (isPromo) {
+        window.promoCountdownInterval = setInterval(() => {
+            const el = document.getElementById('promo-detail-countdown');
+            if (!el) {
+                clearInterval(window.promoCountdownInterval);
+                return;
+            }
+            const endsAt = parseInt(el.getAttribute('data-ends'));
+            const text = formatCountdown(endsAt);
+            el.innerText = `Vence en: ${text}`;
+            if (endsAt <= Date.now()) {
+                clearInterval(window.promoCountdownInterval);
+                alert("Esta promoción ha vencido.");
+                window.goBack();
+            }
+        }, 1000);
+    }
 
     // ===== PRODUCTOS SUGERIDOS =====
     const relatedProducts = state.products.filter(rp =>
@@ -3395,6 +3463,29 @@ function renderCheckout(container) {
         // Guardar pedido en Supabase
         const orderNumber = "EMMA-" + Math.random().toString(36).substr(2, 6).toUpperCase();
         
+        const formattedItems = state.cart.map(item => {
+            let cleanId = item.id;
+            if (typeof cleanId === 'string') {
+                if (cleanId.startsWith('prod_')) {
+                    cleanId = parseInt(cleanId.replace('prod_', ''));
+                } else if (cleanId.startsWith('promo_')) {
+                    cleanId = parseInt(cleanId.replace('promo_', ''));
+                } else {
+                    cleanId = parseInt(cleanId);
+                }
+            } else {
+                cleanId = parseInt(cleanId);
+            }
+            return {
+                id: isNaN(cleanId) ? null : cleanId,
+                product_id: isNaN(cleanId) ? null : cleanId,
+                product_name: item.name,
+                product_image: item.images && item.images.length ? item.images[0] : item.image || '',
+                quantity: item.quantity,
+                price: item.price
+            };
+        });
+
         if (state.supabaseSession) {
             // Usuario autenticado: guardar con su user_id
             try {
@@ -3421,7 +3512,7 @@ function renderCheckout(container) {
                         shipping_apartment: apartment,
                         seller_name: seller.name,
                         seller_number: seller.number?.toString(),
-                        items: state.cart
+                        items: formattedItems
                     })
                 });
             } catch (err) {
@@ -3464,13 +3555,7 @@ function renderCheckout(container) {
                             seller_name: seller.name,
                             seller_number: seller.number?.toString()
                         },
-                        items: state.cart.map(item => ({
-                            product_id: item.id,
-                            product_name: item.name,
-                            product_image: item.images ? item.images[0] : item.image,
-                            quantity: item.quantity,
-                            price: item.price
-                        }))
+                        items: formattedItems
                     })
                 });
             } catch (err) {
@@ -3647,7 +3732,25 @@ function renderCheckoutSuccess(orderNumber, waUrl, items = []) {
 }
 
 window.askInfo = (id) => {
-    const p = state.products.find(x => x.id === id);
+    const isPromo = typeof id === 'string' && id.startsWith('promo_');
+    const isProd = typeof id === 'string' && id.startsWith('prod_');
+    
+    let realId = id;
+    let isPromoItem = isPromo;
+    
+    if (isPromo) {
+        realId = parseInt(id.replace('promo_', ''));
+    } else if (isProd) {
+        realId = parseInt(id.replace('prod_', ''));
+    } else {
+        realId = parseInt(id);
+    }
+    
+    const cartId = isPromoItem ? `promo_${realId}` : `prod_${realId}`;
+    const p = isPromoItem 
+        ? state.promotions.find(x => x.id === realId)
+        : state.products.find(x => x.id === realId);
+        
     if (!p) return;
 
     // Crear el modal dinámicamente
@@ -3669,7 +3772,7 @@ window.askInfo = (id) => {
             <h3 class="text-xs font-black uppercase tracking-wider text-black mb-3">Pedido Rápido</h3>
             
             <p class="text-xs font-bold text-gray-500 uppercase tracking-widest leading-relaxed mb-6">
-                El precio del producto es <span class="text-black font-black">BOB ${p.price.toFixed(2)}</span>.<br>
+                El precio de este artículo es <span class="text-black font-black">BOB ${Number(p.price).toFixed(2)}</span>.<br>
                 ¿Quieres continuar rellenando los datos?
             </p>
             
@@ -3713,9 +3816,9 @@ window.askInfo = (id) => {
 
     document.getElementById('quick-order-confirm').onclick = () => {
         closeModal();
-        const inCart = state.cart.find(x => x.id == id);
+        const inCart = state.cart.find(x => x.id === cartId);
         if (!inCart) {
-            state.cart.push({ ...p, quantity: 1 });
+            state.cart.push({ ...p, id: cartId, quantity: 1 });
             updateCartUI();
         }
         window.toggleCart(false);
@@ -3725,9 +3828,9 @@ window.askInfo = (id) => {
 
 // --- ATAJOS TECLADO ---
 document.addEventListener('keydown', (e) => {
-    if (e.key === "Escape") { window.closeLightbox(); window.closeStory(); }
-    if (e.key === "ArrowRight") { window.nextImg(); if (state.activeStoryIndex !== -1) window.nextStory(); }
-    if (e.key === "ArrowLeft") { window.prevImg(); if (state.activeStoryIndex !== -1) window.prevStory(); }
+    if (e.key === "Escape") { window.closeLightbox(); }
+    if (e.key === "ArrowRight") { window.nextImg(); }
+    if (e.key === "ArrowLeft") { window.prevImg(); }
 });
 
 // --- VISTAS DE PERFIL Y PEDIDOS ---

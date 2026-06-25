@@ -408,35 +408,101 @@ app.put('/api/admin/contacts/:id/assign-products', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// --- STORIES (SOPORTE MÚLTIPLE E IGUAL QUE PRODUCTOS) ---
+// --- PROMOTIONS (MISMOS DATOS QUE PRODUCTOS + DURACIÓN Y EXPIRACIÓN) ---
 
-app.get('/api/stories', async (req, res) => {
+async function initPromotions() {
+    await pool.query(`
+        CREATE TABLE IF NOT EXISTS promotions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            price DECIMAL(10,2) DEFAULT 0.00,
+            description TEXT,
+            images TEXT, -- JSON array of Cloudinary URLs
+            categoryId INT,
+            contactId INT,
+            whatsappCustomMsg TEXT,
+            duration_type VARCHAR(20) NOT NULL,
+            duration_val VARCHAR(50) NOT NULL,
+            endsAt BIGINT NOT NULL,
+            createdAt BIGINT NOT NULL
+        )
+    `);
+}
+
+app.get('/api/promotions', async (req, res) => {
     try {
-        const limit24h = Date.now() - (24 * 60 * 60 * 1000);
-        const [rows] = await pool.query("SELECT * FROM stories WHERE createdAt > ? ORDER BY id DESC", [limit24h]);
-        res.json(rows);
+        await initPromotions();
+        const [rows] = await pool.query("SELECT * FROM promotions ORDER BY id DESC");
+        res.json(rows.map(p => ({ 
+            ...p, 
+            images: JSON.parse(p.images || "[]"),
+            price: parseFloat(p.price) || 0
+        })));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.post('/api/stories', async (req, res) => {
-    // CORRECCIÓN: Ahora acepta un array de imágenes igual que productos
-    const { images, contactId, customMsg } = req.body;
+app.post('/api/promotions', async (req, res) => {
+    const { name, price, description, images, categoryId, contactId, whatsappCustomMsg, durationType, durationVal, endsAt } = req.body;
     try {
-        const uploaded = await uploadToCloudinary(images, 'stories');
+        await initPromotions();
+        const cloudinaryUrls = await uploadToCloudinary(images, 'promotions');
         
-        // Insertamos cada imagen como una story individual
-        for (const url of uploaded) {
-            await pool.execute(
-                "INSERT INTO stories (imageUrl, contactId, customMsg, createdAt) VALUES (?,?,?,?)",
-                [url, contactId, customMsg || "", Date.now()]
-            );
-        }
+        const calculatedEndsAt = endsAt ? parseFloat(endsAt) : (durationType === 'hours' 
+            ? Date.now() + parseFloat(durationVal) * 60 * 60 * 1000 
+            : new Date(durationVal).getTime());
+
+        const values = [
+            name || null,
+            price || 0,
+            description || null,
+            JSON.stringify(cloudinaryUrls),
+            categoryId || null,
+            contactId || null,
+            whatsappCustomMsg || "",
+            durationType || 'hours',
+            durationVal || '0',
+            calculatedEndsAt,
+            Date.now()
+        ];
+
+        const sql = "INSERT INTO promotions (name, price, description, images, categoryId, contactId, whatsappCustomMsg, duration_type, duration_val, endsAt, createdAt) VALUES (?,?,?,?,?,?,?,?,?,?,?)";
+        await pool.execute(sql, values);
         
-        await createLog("STORY", `Subidas ${uploaded.length} stories`);
+        await createLog("PROMO", `Creada promoción: ${name}`);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+app.put('/api/promotions/:id', async (req, res) => {
+    const { name, price, description, images, categoryId, contactId, whatsappCustomMsg, durationType, durationVal, endsAt } = req.body;
+    try {
+        await initPromotions();
+        const cloudinaryUrls = await uploadToCloudinary(images, 'promotions');
+        
+        const calculatedEndsAt = endsAt ? parseFloat(endsAt) : (durationType === 'hours' 
+            ? Date.now() + parseFloat(durationVal) * 60 * 60 * 1000 
+            : new Date(durationVal).getTime());
+
+        const sql = "UPDATE promotions SET name=?, price=?, description=?, images=?, categoryId=?, contactId=?, whatsappCustomMsg=?, duration_type=?, duration_val=?, endsAt=? WHERE id=?";
+        await pool.execute(sql, [
+            name,
+            price || 0,
+            description || null,
+            JSON.stringify(cloudinaryUrls),
+            categoryId || null,
+            contactId || null,
+            whatsappCustomMsg || "",
+            durationType,
+            durationVal,
+            calculatedEndsAt,
+            req.params.id
+        ]);
+        
+        await createLog("EDITAR_PROMO", `ID: ${req.params.id}`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // --- HISTORIAL Y BORRADO ---
@@ -450,7 +516,7 @@ app.get('/api/logs', async (req, res) => {
 
 app.delete('/api/:table/:id', async (req, res) => {
     try {
-        const allowed = ['products', 'categories', 'contacts', 'stories'];
+        const allowed = ['products', 'categories', 'contacts', 'promotions'];
         if (!allowed.includes(req.params.table)) return res.status(400).send("No permitido");
         await pool.execute(`DELETE FROM ${req.params.table} WHERE id = ?`, [req.params.id]);
         await createLog("ELIMINAR", `${req.params.table} ID: ${req.params.id}`);

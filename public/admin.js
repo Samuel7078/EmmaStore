@@ -4,7 +4,7 @@ const adminState = {
     products: [],
     categories: [],
     contacts: [],
-    stories: [],
+    promotions: [],
     logs: [],
     users: [],
     orders: [],
@@ -101,7 +101,7 @@ async function loadAdminData() {
             fetch('/api/products').then(r => r.json()),
             fetch('/api/contacts').then(r => r.json()),
             fetch('/api/categories').then(r => r.json()),
-            fetch('/api/stories').then(r => r.json()),
+            fetch('/api/promotions').then(r => r.json()),
             fetch('/api/logs').then(r => r.json()),
             fetch('/api/admin/users').then(r => r.json()),
             fetch('/api/admin/orders').then(r => r.json()),
@@ -110,7 +110,7 @@ async function loadAdminData() {
         adminState.products = p;
         adminState.contacts = c;
         adminState.categories = cat;
-        adminState.stories = s;
+        adminState.promotions = s;
         adminState.logs = l;
         adminState.users = u || [];
         adminState.orders = o || [];
@@ -224,7 +224,7 @@ function renderAdmin() {
 
     if (adminState.view === 'products') renderProductsView(main);
     else if (adminState.view === 'categories') renderCategoriesView(main);
-    else if (adminState.view === 'stories') renderStoriesView(main);
+    else if (adminState.view === 'promotions') renderPromotionsView(main);
     else if (adminState.view === 'team') renderTeamView(main);
     else if (adminState.view === 'logs') renderLogsView(main);
     else if (adminState.view === 'users') renderUsersView(main);
@@ -527,48 +527,183 @@ async function handleProductSubmit(e) {
 }
 
 // =============================================
-// VISTAS: STORIES
+// VISTAS: PROMOCIONES
 // =============================================
-function renderStoriesView(container) {
+function formatCountdown(endsAt) {
+    const diff = endsAt - Date.now();
+    if (diff <= 0) return "Vencido";
+    
+    const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    const minutes = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
+    
+    let parts = [];
+    if (days > 0) parts.push(`${days}d`);
+    if (hours > 0 || days > 0) parts.push(`${hours}h`);
+    parts.push(`${minutes}m`);
+    return parts.join(' ');
+}
+
+function renderPromotionsView(container) {
     container.innerHTML = `
-        <div class="relative max-w-4xl mx-auto overflow-hidden">
-            <div id="upload-progress-overlay" class="hidden absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center">
-                <div class="w-48 h-2 bg-gray-100 rounded-full overflow-hidden mb-4"><div id="upload-progress-bar" class="h-full bg-black w-0"></div></div>
-                <p id="upload-progress-text" class="text-[9px] font-black uppercase">Subiendo Story...</p>
-            </div>
-            <h2 class="text-2xl md:text-4xl font-black uppercase tracking-tighter mb-8 md:mb-12">Stories (24h)</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
-                <div class="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm">
-                    <form onsubmit="handleStorySubmit(event)" class="space-y-4">
-                        <select name="contactId" required class="w-full p-4 md:p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
-                            <option value="">Vendedor...</option>
-                            ${adminState.contacts.map(v => `<option value="${v.id}">${v.name}</option>`).join('')}
-                        </select>
-                        <div id="preview-container" class="flex justify-center mb-4"></div>
-                        <input type="file" multiple onchange="handleImageUpload(this, true)" id="file-s" class="hidden">
-                        <label for="file-s" class="block p-8 md:p-10 border-2 border-dashed rounded-2xl text-center cursor-pointer text-[10px] font-black uppercase opacity-40">Añadir Foto</label>
-                        <button type="submit" class="w-full bg-black text-white py-4 md:py-5 rounded-2xl font-black text-[10px] uppercase shadow-lg cursor-pointer">Publicar</button>
-                    </form>
+        <div class="flex justify-between items-center mb-8 md:mb-12 animate-fade">
+            <h2 class="text-2xl md:text-4xl font-black uppercase tracking-tighter">Promociones</h2>
+            <button onclick="showPromotionForm()" class="bg-black text-white px-6 md:px-8 py-3 md:py-4 rounded-full text-[10px] font-black uppercase shadow-xl hover:scale-[1.02] active:scale-95 transition-all cursor-pointer">+ Nueva</button>
+        </div>
+        <div class="grid grid-cols-1 gap-3 md:gap-4">
+            ${(adminState.promotions || []).map(p => {
+                const isExpired = p.endsAt <= Date.now();
+                const expiryLabel = isExpired 
+                    ? `<span class="text-red-500 font-bold">Vencida</span>` 
+                    : `<span class="text-green-500 font-bold">Vence en: ${formatCountdown(p.endsAt)}</span>`;
+                return `
+                <div class="bg-white p-4 md:p-6 rounded-2xl md:rounded-[2.5rem] flex items-center gap-4 md:gap-8 shadow-sm">
+                    <img src="${p.images && p.images[0] ? p.images[0] : ''}" class="w-12 h-12 md:w-16 md:h-16 object-cover rounded-xl md:rounded-2xl flex-shrink-0">
+                    <div class="flex-1 min-w-0 text-left">
+                        <p class="text-[11px] font-black uppercase truncate">${p.name}</p>
+                        <p class="text-[9px] opacity-40 font-bold mb-1">BS ${p.price}</p>
+                        <p class="text-[9px] font-bold uppercase tracking-wider">${expiryLabel}</p>
+                    </div>
+                    <div class="flex gap-2 flex-shrink-0">
+                        <button onclick="showPromotionForm(${p.id})" class="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-black hover:text-white transition-all cursor-pointer"><i class="fa-solid fa-edit text-xs"></i></button>
+                        <button onclick="deleteAction('promotions', ${p.id}, '${p.name.replace(/'/g, "\\'")}')" class="w-9 h-9 md:w-10 md:h-10 rounded-full bg-gray-50 flex items-center justify-center hover:bg-red-500 hover:text-white transition-all cursor-pointer"><i class="fa-solid fa-trash text-xs"></i></button>
+                    </div>
                 </div>
-                <div class="grid grid-cols-2 gap-3 md:gap-4">
-                    ${adminState.stories.map(s => `<div class="relative aspect-[9/16] rounded-2xl md:rounded-3xl overflow-hidden group shadow-md">
-                        <img src="${s.imageUrl}" class="w-full h-full object-cover">
-                        <button onclick="deleteAction('stories', ${s.id})" class="absolute top-3 right-3 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg cursor-pointer"><i class="fa-solid fa-times"></i></button>
-                    </div>`).join('')}
-                </div>
-            </div>
+                `;
+            }).join('')}
         </div>
     `;
 }
 
-async function handleStorySubmit(e) {
+function showPromotionForm(promoId = null) {
+    const p = promoId 
+        ? adminState.promotions.find(x => x.id == promoId) 
+        : { name: '', price: '', description: '', categoryId: '', contactId: '', whatsappCustomMsg: '', duration_type: 'hours', duration_val: '' };
+    
+    adminState.isEditing = promoId;
+    adminState.tempImages = promoId ? p.images : [];
+
+    document.getElementById('admin-main').innerHTML = `
+        <div class="max-w-2xl mx-auto bg-white p-6 md:p-12 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl relative overflow-hidden text-left">
+            <div id="upload-progress-overlay" class="hidden absolute inset-0 bg-white/95 z-50 flex flex-col items-center justify-center">
+                <div class="w-64 h-2 bg-gray-100 rounded-full overflow-hidden mb-4"><div id="upload-progress-bar" class="h-full bg-black w-0 transition-all"></div></div>
+                <p id="upload-progress-text" class="text-[10px] font-black uppercase">Iniciando...</p>
+            </div>
+            <button onclick="goBackAdmin()" class="mb-6 flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-gray-400 hover:text-black transition-colors cursor-pointer bg-transparent border-none">
+                <i class="fa-solid fa-arrow-left"></i> Volver
+            </button>
+            <h2 class="text-xl md:text-2xl font-black mb-8 md:mb-10 uppercase tracking-tighter">${promoId ? 'Editar' : 'Nueva'} Promoción</h2>
+            <form onsubmit="handlePromotionSubmit(event)" class="space-y-4">
+                <input id="promo-name" name="name" value="${p.name}" oninput="generatePromoAutoMsg()" placeholder="Nombre" required class="w-full p-4 md:p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
+                <input id="promo-price" name="price" type="number" step="0.01" value="${p.price}" oninput="generatePromoAutoMsg()" placeholder="Precio BS" required class="w-full p-4 md:p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
+                <select name="categoryId" required class="w-full p-4 md:p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
+                    <option value="">Categoría...</option>
+                    ${adminState.categories.map(c => `<option value="${c.id}" ${p.categoryId == c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                </select>
+                <select name="contactId" required class="w-full p-4 md:p-5 bg-gray-50 rounded-2xl outline-none text-[10px] font-bold uppercase">
+                    <option value="">Vendedor...</option>
+                    ${adminState.contacts.map(v => `<option value="${v.id}" ${p.contactId == v.id ? 'selected' : ''}>${v.name}</option>`).join('')}
+                </select>
+                <textarea name="description" placeholder="Descripción" class="w-full p-4 md:p-5 bg-gray-50 rounded-2xl h-32 outline-none text-[10px] font-bold uppercase">${p.description}</textarea>
+                
+                <div class="bg-gray-50 p-6 rounded-[2rem] border border-gray-150 space-y-4">
+                    <h4 class="text-[10px] font-black uppercase tracking-widest text-gray-400">Duración de la Promoción</h4>
+                    <select id="promo-duration-type" name="durationType" onchange="togglePromoDurationInput()" class="w-full p-4 bg-white rounded-xl border border-gray-200 outline-none text-[10px] font-bold uppercase">
+                        <option value="hours" ${p.duration_type === 'hours' ? 'selected' : ''}>Desactivar en X horas</option>
+                        <option value="datetime" ${p.duration_type === 'datetime' ? 'selected' : ''}>Fecha y hora límite</option>
+                    </select>
+                    
+                    <div id="promo-duration-val-hours-container" class="${p.duration_type === 'hours' ? '' : 'hidden'}">
+                        <input id="promo-duration-val-hours" type="number" step="0.5" value="${p.duration_type === 'hours' ? p.duration_val : ''}" placeholder="Cantidad de horas (ej: 5)" class="w-full p-4 bg-white rounded-xl border border-gray-200 outline-none text-[10px] font-bold uppercase">
+                    </div>
+                    
+                    <div id="promo-duration-val-datetime-container" class="${p.duration_type === 'datetime' ? '' : 'hidden'}">
+                        <input id="promo-duration-val-datetime" type="datetime-local" value="${p.duration_type === 'datetime' ? p.duration_val : ''}" class="w-full p-4 bg-white rounded-xl border border-gray-200 outline-none text-[10px] font-bold uppercase">
+                    </div>
+                </div>
+
+                <div class="bg-green-50 p-4 md:p-6 rounded-2xl border-2 border-dashed border-green-100">
+                    <p class="text-[9px] font-black uppercase mb-3 text-green-600 italic">Vista previa mensaje WhatsApp:</p>
+                    <textarea id="whatsapp-promo-msg-input" name="whatsappCustomMsg" class="w-full p-4 bg-white rounded-xl h-24 outline-none text-[10px] font-bold uppercase shadow-inner border-none">${p.whatsappCustomMsg || ''}</textarea>
+                </div>
+
+                <div id="preview-container" class="flex flex-wrap gap-4 mb-4">${adminState.tempImages.map(img => `
+                    <div class="relative group">
+                        <img src="${img}" class="w-20 h-20 md:w-24 md:h-24 object-cover rounded-2xl shadow-md border-2 border-white">
+                        <button type="button" onclick="removeTempImage(this, '${img}')" class="absolute -top-2 -right-2 bg-red-500 text-white w-5 h-6 rounded-full text-xs flex items-center justify-center">×</button>
+                    </div>`).join('')}
+                </div>
+                <input type="file" multiple onchange="handleImageUpload(this)" id="file-promo" class="hidden">
+                <label for="file-promo" class="block p-8 md:p-10 border-4 border-dashed rounded-[2rem] md:rounded-[2.5rem] text-center cursor-pointer text-[10px] font-black uppercase opacity-40 hover:opacity-100 transition-all">Subir Imágenes</label>
+                <div class="flex gap-3 md:gap-4 pt-4 md:pt-6">
+                    <button type="button" onclick="goBackAdmin()" class="flex-1 py-4 md:py-5 border-2 border-black rounded-2xl font-black text-[10px] uppercase cursor-pointer bg-white">Cancelar</button>
+                    <button type="submit" class="flex-1 py-4 md:py-5 bg-black text-white rounded-2xl font-black text-[10px] uppercase shadow-xl cursor-pointer">Guardar</button>
+                </div>
+            </form>
+        </div>
+    `;
+    if(!promoId) generatePromoAutoMsg();
+}
+
+window.togglePromoDurationInput = () => {
+    const type = document.getElementById('promo-duration-type').value;
+    const hoursContainer = document.getElementById('promo-duration-val-hours-container');
+    const datetimeContainer = document.getElementById('promo-duration-val-datetime-container');
+    if (type === 'hours') {
+        hoursContainer.classList.remove('hidden');
+        datetimeContainer.classList.add('hidden');
+    } else {
+        hoursContainer.classList.add('hidden');
+        datetimeContainer.classList.remove('hidden');
+    }
+};
+
+window.generatePromoAutoMsg = () => {
+    const name = document.getElementById('promo-name')?.value.trim() || "[NOMBRE]";
+    const price = document.getElementById('promo-price')?.value.trim() || "[PRECIO]";
+    const msgInput = document.getElementById('whatsapp-promo-msg-input');
+    if(msgInput) {
+        msgInput.value = `¡Hola Emma Store! Estoy interesad@ en la promoción: ${name} con precio de: BS ${price}`;
+    }
+};
+
+async function handlePromotionSubmit(e) {
     e.preventDefault();
-    if (adminState.tempImages.length === 0) return alert("Selecciona una imagen.");
-    const data = {
-        contactId: new FormData(e.target).get('contactId'),
-        images: adminState.tempImages
-    };
-    sendWithProgress('/api/stories', 'POST', data, () => { loadAdminData(); setAdminView('stories'); });
+    if (adminState.tempImages.length === 0) return alert("Selecciona al menos una imagen.");
+    
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+    
+    const type = data.durationType;
+    let val = '';
+    let endsAt = 0;
+    
+    if (type === 'hours') {
+        val = document.getElementById('promo-duration-val-hours').value;
+        if (!val || isNaN(parseFloat(val)) || parseFloat(val) <= 0) {
+            return alert("Por favor ingresa una cantidad válida de horas.");
+        }
+        endsAt = Date.now() + parseFloat(val) * 60 * 60 * 1000;
+    } else {
+        val = document.getElementById('promo-duration-val-datetime').value;
+        if (!val) {
+            return alert("Por favor selecciona una fecha y hora límite.");
+        }
+        endsAt = new Date(val).getTime();
+        if (endsAt <= Date.now()) {
+            return alert("La fecha y hora límite deben ser en el futuro.");
+        }
+    }
+    
+    data.durationVal = val;
+    data.endsAt = endsAt;
+    data.images = adminState.tempImages;
+    
+    const url = adminState.isEditing ? `/api/promotions/${adminState.isEditing}` : '/api/promotions';
+    sendWithProgress(url, adminState.isEditing ? 'PUT' : 'POST', data, () => { 
+        loadAdminData(); 
+        setAdminView('promotions'); 
+    });
 }
 
 // =============================================
