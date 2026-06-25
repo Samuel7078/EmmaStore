@@ -2714,8 +2714,16 @@ function renderCheckout(container) {
     const shippingCostLocal = (state.storeConfig && state.storeConfig.shipping_cost) || 15;
     const carrierCost = 0;
 
-    // Costo inicial de envío según zona
-    let shippingCost = isInCoverageZone ? shippingCostLocal : carrierCost;
+    // Costo inicial de envío según zona y opciones disponibles
+    const opts = (state.storeConfig && state.storeConfig.shipping_options) || [];
+    let shippingCost = carrierCost;
+    if (isInCoverageZone) {
+        if (opts.length > 0) {
+            shippingCost = opts[0].price;
+        } else {
+            shippingCost = shippingCostLocal;
+        }
+    }
     
     const wrapper = document.createElement('div');
     wrapper.className = "max-w-7xl mx-auto px-4 py-8 flex flex-col lg:flex-row lg:gap-12 animate-fade text-black";
