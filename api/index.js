@@ -790,28 +790,36 @@ async function sendOrderEmails(orderData, items) {
                 } catch (spError) {
                     console.error("Error al enviar SendPulse vía API:", spError);
                 }
-            } else if (process.env.GMAIL_USER_2 && process.env.GMAIL_PASS_2) {
-                try {
-                    const clientTransporter = nodemailer.createTransport({
-                        service: 'gmail',
-                        auth: {
-                            user: process.env.GMAIL_USER_2,
-                            pass: process.env.GMAIL_PASS_2
-                        }
-                    });
-                    
-                    const clientMailOptions = {
-                        from: '"Emma Store" <' + process.env.GMAIL_USER_2 + '>',
-                        to: orderData.contact_email,
-                        subject: `Confirmación de pedido #${orderData.order_number} - Emma Store`,
-                        html: emailHtml
-                    };
-                    
-                    const info = await clientTransporter.sendMail(clientMailOptions);
-                    console.log("Email cliente enviado vía Gmail secundario:", info.response);
-                    await incrementEmailCount('gmail2');
-                } catch (gmError) {
-                    console.error("Error enviando email al cliente vía Gmail secundario:", gmError);
+            } else {
+                const userMail = process.env.GMAIL_USER_2 || process.env.GMAIL_USER;
+                const passMail = process.env.GMAIL_PASS_2 || process.env.GMAIL_PASS;
+                if (userMail && passMail) {
+                    try {
+                        const clientTransporter = nodemailer.createTransport({
+                            service: 'gmail',
+                            auth: {
+                                user: userMail,
+                                pass: passMail
+                            }
+                        });
+                        
+                        const clientMailOptions = {
+                            from: `"Emma Store" <${userMail}>`,
+                            to: orderData.contact_email,
+                            subject: `Confirmación de pedido #${orderData.order_number} - Emma Store`,
+                            html: emailHtml
+                        };
+                        
+                        const info = await clientTransporter.sendMail(clientMailOptions);
+                        console.log("Email cliente enviado:", info.response);
+                        await incrementEmailCount('gmail2');
+                    } catch (gmError) {
+                        console.error("Error enviando email al cliente:", gmError);
+                        await createLog("EMAIL_ERROR", `Error enviando email de confirmacion a cliente (${orderData.contact_email}): ${gmError.message}`);
+                    }
+                } else {
+                    console.warn("No se configuraron credenciales SMTP para enviar confirmación al cliente.");
+                    await createLog("EMAIL_WARNING", `No se configuró GMAIL_USER o GMAIL_USER_2 para enviar confirmación al cliente para el pedido ${orderData.order_number}`);
                 }
             }
         }
@@ -899,6 +907,7 @@ async function sendOrderEmails(orderData, items) {
                     await incrementEmailCount('admin');
                 } catch (gmError) {
                     console.error("Error enviando email admin:", gmError);
+                    await createLog("EMAIL_ERROR", `Error enviando email de alerta al admin: ${gmError.message}`);
                 }
             }
         }
@@ -1268,9 +1277,13 @@ async function initStoreConfig() {
             shipping_cost DECIMAL(10,2) DEFAULT 15.00,
             carrier_cost DECIMAL(10,2) DEFAULT 25.00,
             delivery_zones JSON DEFAULT ('["Cochabamba"]'),
+            qr_payment_url TEXT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )
     `);
+    try {
+        await pool.query("ALTER TABLE store_config ADD COLUMN qr_payment_url TEXT NULL");
+    } catch (_) {}
     const [rows] = await pool.query("SELECT * FROM store_config WHERE id = 1");
     if (rows.length === 0) {
         await pool.query(
@@ -1288,12 +1301,13 @@ app.get('/api/admin/store-config', async (req, res) => {
     try {
         await initStoreConfig();
         const [rows] = await pool.query("SELECT * FROM store_config WHERE id = 1");
-        if (rows.length === 0) return res.json({ shipping_cost: 15, carrier_cost: 25, delivery_zones: ["Cochabamba"] });
+        if (rows.length === 0) return res.json({ shipping_cost: 15, carrier_cost: 25, delivery_zones: ["Cochabamba"], qr_payment_url: null });
         const r = rows[0];
         res.json({
             shipping_cost: parseFloat(r.shipping_cost),
             carrier_cost: parseFloat(r.carrier_cost),
             delivery_zones: typeof r.delivery_zones === 'string' ? JSON.parse(r.delivery_zones) : r.delivery_zones,
+            qr_payment_url: r.qr_payment_url || null,
             updated_at: r.updated_at
         });
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1303,12 +1317,13 @@ app.get('/api/admin/store-config', async (req, res) => {
 app.put('/api/admin/store-config', async (req, res) => {
     try {
         await initStoreConfig();
-        const { shipping_cost, carrier_cost, delivery_zones } = req.body;
+        const { shipping_cost, carrier_cost, delivery_zones, qr_payment_url } = req.body;
         const updates = [];
         const values = [];
         if (shipping_cost !== undefined) { updates.push('shipping_cost = ?'); values.push(parseFloat(shipping_cost)); }
         if (carrier_cost !== undefined) { updates.push('carrier_cost = ?'); values.push(parseFloat(carrier_cost)); }
         if (delivery_zones !== undefined) { updates.push('delivery_zones = ?'); values.push(JSON.stringify(delivery_zones)); }
+        if (qr_payment_url !== undefined) { updates.push('qr_payment_url = ?'); values.push(qr_payment_url); }
         if (updates.length === 0) return res.status(400).json({ error: "Nada que actualizar" });
         values.push(1);
         await pool.query(`UPDATE store_config SET ${updates.join(', ')} WHERE id = ?`, values);
@@ -1349,13 +1364,14 @@ app.get('/api/store-config', async (req, res) => {
     try {
         await initStoreConfig();
         await initShippingOptions();
-        const [cfgRows] = await pool.query("SELECT shipping_cost, carrier_cost, delivery_zones FROM store_config WHERE id = 1");
+        const [cfgRows] = await pool.query("SELECT shipping_cost, carrier_cost, delivery_zones, qr_payment_url FROM store_config WHERE id = 1");
         const [optRows] = await pool.query("SELECT * FROM shipping_options WHERE is_active = 1 ORDER BY sort_order, id");
-        const cfg = cfgRows[0] || { shipping_cost: 15, carrier_cost: 25, delivery_zones: '["Cochabamba"]' };
+        const cfg = cfgRows[0] || { shipping_cost: 15, carrier_cost: 25, delivery_zones: '["Cochabamba"]', qr_payment_url: null };
         res.json({
             shipping_cost: parseFloat(cfg.shipping_cost),
             carrier_cost: parseFloat(cfg.carrier_cost),
             delivery_zones: typeof cfg.delivery_zones === 'string' ? JSON.parse(cfg.delivery_zones) : cfg.delivery_zones,
+            qr_payment_url: cfg.qr_payment_url || null,
             shipping_options: optRows.map(o => ({ ...o, price: parseFloat(o.price) }))
         });
     } catch (err) { res.status(500).json({ error: err.message }); }

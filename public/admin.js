@@ -2198,6 +2198,30 @@ function renderDeliveryContent(container, config, options) {
                     </div>
                     <p class="text-[9px] text-gray-400 font-bold mt-2">Referencia de costo para envíos fuera de zona. (Se informa internamente el costo final).</p>
                 </div>
+
+                <!-- QR de Pago (Para Encomiendas) -->
+                <div class="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm">
+                    <label class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-2">
+                        <i class="fa-solid fa-qrcode mr-1 text-green-500"></i>
+                        Imagen QR de Pago (URL)
+                    </label>
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="flex items-center gap-2 flex-1 bg-green-50 border-2 border-transparent focus-within:border-green-400 rounded-2xl px-4 py-3 transition-all">
+                            <input type="text" id="delivery-qr-url" value="${config.qr_payment_url || ''}" placeholder="Ej: https://cloudinary.com/... o /assets/qr.png"
+                                class="flex-1 bg-transparent text-sm font-black outline-none text-black">
+                        </div>
+                        <button onclick="savePaymentQR()" class="px-6 py-3 bg-green-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-green-600 active:scale-95 transition-all cursor-pointer border-none shadow-md">
+                            Guardar QR
+                        </button>
+                    </div>
+                    <p class="text-[9px] text-gray-400 font-bold">Introduce la URL de tu imagen QR de pago. Si la dejas vacía, se deshabilitará la opción de QR en el checkout.</p>
+                    ${config.qr_payment_url ? `
+                        <div class="mt-4 p-2 bg-gray-50 border border-gray-150 rounded-xl inline-block">
+                            <p class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5 text-center">QR Activo</p>
+                            <img src="${config.qr_payment_url}" class="h-28 w-28 object-contain mx-auto bg-white border border-gray-100 rounded-lg p-1">
+                        </div>
+                    ` : ''}
+                </div>
                 
             </div>
         </div>
@@ -2372,6 +2396,15 @@ window.saveCarrierCost = () => {
     
     sendWithProgress('/api/admin/store-config', 'PUT', { carrier_cost: cost }, () => {
         showAdminToast('✓ Cargo transportadora guardado: Bs. ' + cost.toFixed(2));
+        refreshDeliveryDataSilently();
+    });
+};
+
+window.savePaymentQR = () => {
+    const qrUrl = document.getElementById('delivery-qr-url').value.trim();
+    
+    sendWithProgress('/api/admin/store-config', 'PUT', { qr_payment_url: qrUrl }, () => {
+        showAdminToast('✓ QR de pago configurado con éxito');
         refreshDeliveryDataSilently();
     });
 };
