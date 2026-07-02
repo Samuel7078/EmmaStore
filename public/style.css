@@ -656,3 +656,367 @@ body {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-8px); }
 }
+
+/* --- PRECIO LLAMATIVO Y SHIMMERING/MOVING --- */
+.price-shine-move {
+    display: inline-block;
+    position: relative;
+    font-size: 1.55rem;
+    font-weight: 900;
+    color: #000;
+    overflow: hidden;
+    animation: pricePulse 2.5s ease-in-out infinite, priceColorGlow 4s ease-in-out infinite;
+    text-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+}
+
+.price-shine-move::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.9) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    transform: skewX(-20deg);
+    animation: priceShine 3s infinite;
+}
+
+@keyframes pricePulse {
+    0%, 100% {
+        transform: scale(1) translateY(0);
+    }
+    50% {
+        transform: scale(1.08) translateY(-2px);
+    }
+}
+
+@keyframes priceShine {
+    0% {
+        left: -150%;
+    }
+    50% {
+        left: 150%;
+    }
+    100% {
+        left: 150%;
+    }
+}
+
+@keyframes priceColorGlow {
+    0%, 100% {
+        text-shadow: 0 0 5px rgba(34, 197, 94, 0);
+    }
+    50% {
+        text-shadow: 0 0 15px rgba(34, 197, 94, 0.4);
+    }
+}
+
+/* Para el modo oscuro (por ejemplo, en tarjetas de fondo negro) */
+.price-shine-move-white {
+    display: inline-block;
+    position: relative;
+    font-size: 1.95rem;
+    font-weight: 900;
+    color: #fff;
+    overflow: hidden;
+    animation: pricePulse 2.5s ease-in-out infinite, priceColorGlowWhite 4s ease-in-out infinite;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+}
+
+.price-shine-move-white::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -150%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.95) 50%,
+        rgba(255, 255, 255, 0) 100%
+    );
+    transform: skewX(-20deg);
+    animation: priceShine 3s infinite;
+}
+
+@keyframes priceColorGlowWhite {
+    0%, 100% {
+        text-shadow: 0 0 5px rgba(255, 255, 255, 0);
+    }
+    50% {
+        text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+    }
+}
+
+/* --- MODO OSCURO (DARK MODE CORE OVERRIDES) --- */
+body.dark {
+    background: radial-gradient(circle at 50% 0%, #1c1917 0%, #09090b 100%) !important;
+    background-color: #09090b !important;
+    color: #ffffff !important;
+}
+
+body.dark .emma-logo-container {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    border-color: #f3f4f6 !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+}
+
+body.dark #main-header {
+    background-color: rgba(9, 9, 11, 0.8) !important;
+    border-color: #1c1917 !important;
+}
+
+body.dark #main-header span,
+body.dark #main-header button,
+body.dark #main-header nav a,
+body.dark #main-header nav button,
+body.dark #main-header input {
+    color: #ffffff !important;
+}
+
+body.dark #main-header input::placeholder {
+    color: #555555 !important;
+}
+
+body.dark #desktop-search-input,
+body.dark #mobile-search-input-header,
+body.dark #mobile-search-input {
+    background-color: #121212 !important;
+    border-color: #27272a !important;
+    color: #ffffff !important;
+}
+
+/* Invert all background whites and grays to shiny metallic black with white inner glow */
+body.dark .bg-white,
+body.dark .bg-gray-50,
+body.dark .bg-gray-50\/20,
+body.dark .bg-gray-50\/70,
+body.dark .glass-effect,
+body.dark .benefit-card,
+body.dark .testimonial-card,
+body.dark .faq-item,
+body.dark #cart-content,
+body.dark #dept-modal-card,
+body.dark #login-hook-card,
+body.dark #privacy-policy-card,
+body.dark #account-drawer-card,
+body.dark #filter-drawer-card {
+    background: linear-gradient(145deg, #18181b, #09090b) !important;
+    color: #ffffff !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), inset 0 1px 1.5px rgba(255, 255, 255, 0.15) !important;
+}
+
+body.dark .border,
+body.dark .border-gray-50,
+body.dark .border-gray-100,
+body.dark .border-gray-150,
+body.dark .border-gray-200 {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Invert wrappers/divs with light background gradients to dark gradient */
+body.dark .section-divider {
+    background: radial-gradient(circle at 50% 0%, #18181b 0%, #09090b 100%) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.dark .category-carousel-section {
+    background: linear-gradient(135deg, #18181b 0%, #09090b 100%) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+body.dark .footer-enhanced {
+    background: linear-gradient(180deg, #18181b 0%, #09090b 100%) !important;
+    border-top-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Invert black button to white button */
+body.dark .bg-black {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
+
+body.dark .text-black,
+body.dark h1,
+body.dark h2,
+body.dark h3,
+body.dark h4,
+body.dark h5,
+body.dark h6,
+body.dark p,
+body.dark span,
+body.dark a {
+    color: #ffffff !important;
+}
+
+/* Specific button styles */
+body.dark .btn-premium.bg-black {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
+
+body.dark button.bg-black,
+body.dark a.bg-black {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
+
+body.dark .text-gray-400,
+body.dark .text-gray-500,
+body.dark .text-gray-600 {
+    color: #a1a1aa !important;
+}
+
+/* Recommended spotlight background remains dark but inner items adjust */
+body.dark .bg-black.text-white {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+}
+
+/* Form inputs */
+body.dark input,
+body.dark select,
+body.dark textarea {
+    background-color: #121212 !important;
+    color: #ffffff !important;
+    border-color: #27272a !important;
+}
+
+body.dark input::placeholder {
+    color: #71717a !important;
+}
+
+/* Cart sidebar background */
+body.dark #cart-sidebar {
+    background-color: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Sticky department modal and header menu items */
+body.dark #catalog-dropdown {
+    background-color: #0c0c0c !important;
+    border-color: #1a1a1a !important;
+}
+
+/* Department buttons */
+body.dark .dept-btn {
+    background-color: #121212 !important;
+    border-color: #1a1a1a !important;
+    color: #ffffff !important;
+}
+body.dark .dept-btn:hover {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
+
+/* Mobile bottom navigation tab bar */
+body.dark #mobile-tab-bar {
+    background-color: rgba(12, 12, 12, 0.85) !important;
+    border-color: #1a1a1a !important;
+}
+body.dark #mobile-tab-bar button {
+    color: #a1a1aa !important;
+}
+body.dark #mobile-tab-bar button.text-black {
+    color: #ffffff !important;
+}
+
+/* Invert white elements in recommended section */
+body.dark .price-shine-move {
+    color: #ffffff !important;
+}
+
+body.dark .price-shine-move-white {
+    color: #ffffff !important;
+}
+
+/* Theme toggle button specific theme color */
+body.dark #theme-toggle-btn {
+    background-color: #121212 !important;
+    border-color: #27272a !important;
+}
+
+/* Checkout inputs and boxes */
+body.dark .bg-gray-50\/70 {
+    background-color: #0c0c0c !important;
+    border-color: #1a1a1a !important;
+}
+
+body.dark select#filter-sort {
+    background-color: #121212 !important;
+    color: #ffffff !important;
+    border-color: #27272a !important;
+}
+
+body.dark select#chk-city {
+    background-color: #121212 !important;
+    color: #ffffff !important;
+    border-color: #27272a !important;
+}
+
+body.dark select#chk-country {
+    background-color: #121212 !important;
+    color: #ffffff !important;
+    border-color: #27272a !important;
+}
+
+body.dark select#chk-saved-address {
+    background-color: #121212 !important;
+    color: #ffffff !important;
+    border-color: #27272a !important;
+}
+
+body.dark #theme-toggle-btn i {
+    color: #facc15 !important;
+}
+
+/* Checkout Loader Overlay Dark Mode Override */
+body.dark #global-checkout-loader {
+    background-color: rgba(9, 9, 11, 0.96) !important;
+}
+
+body.dark #global-checkout-loader h3 {
+    color: #ffffff !important;
+}
+
+body.dark #global-checkout-loader p {
+    background-color: #121212 !important;
+    color: #a1a1aa !important;
+}
+
+body.dark #global-checkout-loader p i {
+    color: #ffffff !important;
+}
+
+body.dark #global-checkout-loader .emma-logo-container,
+body.dark #global-checkout-loader .w-24 {
+    background-color: #ffffff !important;
+    border-color: #1a1a1a !important;
+}
+
+/* Cinemática de Tambalear / Wobble */
+.wobble-cinematic {
+    animation: wobbleEffect 8s ease-in-out infinite;
+}
+
+@keyframes wobbleEffect {
+    0%, 100% {
+        transform: rotate(0deg) translateY(0) scale(1);
+    }
+    25% {
+        transform: rotate(-1.8deg) translateY(-6px) scale(1.03);
+    }
+    50% {
+        transform: rotate(0.6deg) translateY(0) scale(1);
+    }
+    75% {
+        transform: rotate(1.8deg) translateY(-6px) scale(1.03);
+    }
+}

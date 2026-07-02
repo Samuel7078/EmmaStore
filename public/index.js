@@ -547,21 +547,19 @@ window.openLoginHookModal = (actionPending = null) => {
     const modal = document.getElementById('login-hook-modal');
     const card = document.getElementById('login-hook-card');
     if (modal && card) {
-        const termsAccepted = localStorage.getItem('emma_terms_accepted') === 'true';
-        const checkboxContainer = document.getElementById('privacy-checkbox-container');
-        const checkbox = document.getElementById('privacy-accept-checkbox');
-        
-        if (termsAccepted && checkbox && checkboxContainer) {
-            checkbox.checked = true;
-            checkboxContainer.style.display = 'none';
-        } else if (checkboxContainer) {
-            checkboxContainer.style.display = '';
-        }
-        window.updateLoginButtonsState();
-
         modal.classList.remove('invisible', 'opacity-0');
         card.classList.remove('scale-90');
         card.classList.add('scale-100');
+    }
+};
+
+window.acceptPrivacyAndContinue = () => {
+    localStorage.setItem('emma_privacy_accepted', 'true');
+    window.closeLoginHookModal();
+    if (state.pendingAction) {
+        const action = state.pendingAction;
+        state.pendingAction = null;
+        action();
     }
 };
 
@@ -646,31 +644,7 @@ window.closePrivacyPolicy = () => {
     }
 };
 
-window.updateLoginButtonsState = () => {
-    const isChecked = document.getElementById('privacy-accept-checkbox')?.checked;
-    const btnGoogle = document.getElementById('btn-login-google');
-    const btnGuest = document.getElementById('btn-login-guest');
-    
-    if (btnGoogle && btnGuest) {
-        if (isChecked) {
-            btnGoogle.disabled = false;
-            btnGoogle.classList.remove('opacity-50', 'cursor-not-allowed');
-            btnGoogle.classList.add('active:scale-95', 'hover:bg-gray-900');
-            
-            btnGuest.disabled = false;
-            btnGuest.classList.remove('opacity-50', 'cursor-not-allowed');
-            btnGuest.classList.add('active:scale-95', 'hover:bg-gray-50');
-        } else {
-            btnGoogle.disabled = true;
-            btnGoogle.classList.add('opacity-50', 'cursor-not-allowed');
-            btnGoogle.classList.remove('active:scale-95', 'hover:bg-gray-900');
-            
-            btnGuest.disabled = true;
-            btnGuest.classList.add('opacity-50', 'cursor-not-allowed');
-            btnGuest.classList.remove('active:scale-95', 'hover:bg-gray-50');
-        }
-    }
-};
+window.updateLoginButtonsState = () => {};
 
 async function loadUserAddresses() {
     if (!state.supabaseSession) return;
@@ -1403,7 +1377,6 @@ function render() {
         renderHero(main);
         renderBenefits(main);
         renderRandomProductSpotlight(main);
-        renderHowItWorks(main);
         renderRandomCategoryCarousel(main);
         renderTestimonials(main);
         renderFAQ(main);
@@ -1584,8 +1557,8 @@ function renderHero(container) {
                 </p>
                 
                 <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                    <button onclick="window.navigate('catalog')" class="btn-premium pulse-green bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl active:scale-95 flex items-center justify-center gap-3 w-full sm:w-auto">
-                        <i class="fa-solid fa-bag-shopping"></i> Ver Catálogo Completo <i class="fa-solid fa-arrow-right"></i>
+                    <button onclick="window.navigate('catalog')" class="btn-premium pulse-green bg-green-500 hover:bg-green-600 text-white px-12 py-6 rounded-2xl text-sm sm:text-base font-black uppercase tracking-widest shadow-xl hover:shadow-2xl active:scale-95 flex items-center justify-center gap-3 w-full sm:w-auto">
+                        <i class="fa-solid fa-bag-shopping text-lg"></i> Ver Catálogo Completo <i class="fa-solid fa-arrow-right text-lg"></i>
                     </button>
                 </div>
             </div>
@@ -1686,7 +1659,7 @@ function renderBenefits(container) {
             </div>
             
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="benefit-card reveal-up-d1">
+                <div onclick="window.open('https://wa.me/59178986924?text=Hola%20Emma%20Store,%20necesito%20atenci%C3%B3n%20personalizada%20con%20un%20asesor', '_blank')" class="benefit-card reveal-up-d1 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all">
                     <div class="benefit-icon bg-green-50 text-green-500">
                         <i class="fa-brands fa-whatsapp"></i>
                     </div>
@@ -1869,22 +1842,7 @@ function renderTestimonials(container) {
                 </div>
             </div>
             
-            <!-- Garantía -->
-            <div class="mt-12 md:mt-16 reveal-scale">
-                <div class="bg-black rounded-[2rem] p-8 md:p-12 flex flex-col md:flex-row items-center gap-6 md:gap-10 text-center md:text-left">
-                    <div class="w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-white/10 flex items-center justify-center text-3xl md:text-4xl flex-shrink-0">
-                        🛡️
-                    </div>
-                    <div class="flex-1">
-                        <h4 class="text-white text-sm md:text-base font-black uppercase tracking-wider mb-2">Garantía de Satisfacción Emma Store</h4>
-                        <p class="text-white/60 text-xs md:text-sm font-medium leading-relaxed">Si tu producto presenta fallas de fábrica, gestionamos el cambio inmediato sin costo adicional. Tu confianza y satisfacción son lo más importante para nosotros.</p>
-                    </div>
-                    <button onclick="window.open('https://wa.me/59178986924?text=Hola%20Emma%20Store,%20tengo%20una%20consulta%20sobre%20la%20garant%C3%ADa', '_blank')" 
-                            class="btn-premium bg-white text-black px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 active:scale-95 flex-shrink-0 transition-all">
-                        Consultar
-                    </button>
-                </div>
-            </div>
+
         </div>
     `;
     container.appendChild(div);
@@ -1991,17 +1949,17 @@ function renderRandomCategoryCarousel(container) {
                                         <div class="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-[6px] font-black uppercase tracking-wider">Agotado</div>
                                     ` : ''}
                                 </div>
-                                <div class="px-1 text-left">
+                                <div class="px-1 text-center flex flex-col items-center gap-1.5">
                                     <span class="text-[8px] font-extrabold uppercase tracking-wider text-gray-400 block mb-1">${state.randomCategoryName}</span>
                                     <h4 class="text-[10px] md:text-xs font-black uppercase text-black line-clamp-1 leading-tight mb-1 group-hover:text-gray-600 transition-colors">${p.name}</h4>
-                                    <div class="flex justify-between items-center mt-2">
-                                        <span class="text-[10px] md:text-xs font-black text-black">BS ${p.price}</span>
-                                        ${!isOutOfStock ? `
-                                            <button onclick="event.stopPropagation(); addToCart(${p.id})" class="p-2 bg-black hover:bg-gray-800 text-white rounded-lg flex items-center justify-center transition-all active:scale-90 shadow-sm border-none cursor-pointer">
-                                                <i class="fa-solid fa-plus text-[8px]"></i>
-                                            </button>
-                                        ` : ''}
+                                    <div class="mt-1">
+                                        <span class="price-shine-move text-base md:text-lg">BS ${p.price}</span>
                                     </div>
+                                    ${!isOutOfStock ? `
+                                        <button onclick="event.stopPropagation(); addToCart(${p.id})" class="mt-1 py-1.5 px-4 bg-black hover:bg-gray-800 text-white rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1 transition-all active:scale-90 shadow-sm border-none cursor-pointer">
+                                            <i class="fa-solid fa-plus"></i> Añadir
+                                        </button>
+                                    ` : ''}
                                 </div>
                             </div>
                         `;
@@ -2074,7 +2032,8 @@ function renderRandomCategoryCarousel(container) {
 }
 
 function renderRandomProductSpotlight(container) {
-    const products = state.spotlightProducts || state.products.slice(0, 5);
+    // Seleccionar 5 productos aleatorios para recomendar
+    const products = state.products.slice().sort(() => 0.5 - Math.random()).slice(0, 5);
     if (!products || products.length === 0) return;
 
     if (window.spotlightCarouselInterval) {
@@ -2106,18 +2065,18 @@ function renderRandomProductSpotlight(container) {
                         <div class="flex flex-col lg:flex-row gap-6 lg:gap-12 items-center justify-center p-8 md:p-14">
                             
                             <!-- Columna Izquierda: Información del producto -->
-                            <div class="w-full lg:w-[55%] flex flex-col items-center lg:items-start text-center lg:text-left order-2 lg:order-1 relative z-10">
+                            <div class="w-full lg:w-[55%] flex flex-col items-center text-center order-2 lg:order-1 relative z-10">
                                 <div class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-white/10 rounded-full border border-white/10 mb-6">
                                     <span class="text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] text-white/80">★ Recomendado de la Semana</span>
                                 </div>
                                 
                                 <span class="text-[8px] md:text-[10px] font-black tracking-widest text-white/40 uppercase mb-2">${categoryLabel}</span>
-                                <h3 class="text-2xl sm:text-3xl md:text-5xl font-black uppercase tracking-tighter text-white leading-[0.95] mb-6">
+                                <h3 class="text-2xl sm:text-3xl md:text-5xl font-black uppercase tracking-normal text-white leading-[0.95] mb-6">
                                     ${p.name}
                                 </h3>
                                 
-                                <!-- Lista de características con checkmarks -->
-                                <div class="space-y-3 mb-8 text-left w-full">
+                                <!-- Lista de características con checkmarks alineada a la izquierda -->
+                                <div class="space-y-3 mb-8 flex flex-col items-start text-left w-fit mx-auto">
                                     ${features.length > 0 ? features.map(f => `
                                         <div class="text-xs md:text-sm text-white/80 flex items-start gap-2.5 font-medium leading-relaxed">
                                             <i class="fa-solid fa-circle-check text-green-400 text-sm mt-0.5 flex-shrink-0"></i>
@@ -2135,11 +2094,11 @@ function renderRandomProductSpotlight(container) {
                                     `}
                                 </div>
                                 
-                                <div class="text-2xl md:text-3xl font-black tracking-tight text-white mb-8">
-                                    BS ${p.price}
+                                <div class="text-center mb-8">
+                                    <span class="price-shine-move-white text-3xl md:text-4xl">BS ${p.price}</span>
                                 </div>
                                 
-                                <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                                <div class="flex flex-col sm:flex-row gap-4 w-full sm:w-auto justify-center">
                                     ${isOutOfStock ? `
                                         <button disabled class="w-full sm:w-auto bg-white/10 text-white/40 border border-white/10 px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed select-none">
                                             Agotado temporalmente
@@ -2155,10 +2114,10 @@ function renderRandomProductSpotlight(container) {
                                 </div>
                             </div>
                             
-                            <!-- Columna Derecha: Imagen del producto -->
-                            <div class="w-full lg:w-[35%] flex items-center justify-center order-1 lg:order-2 relative z-10">
-                                <div class="relative w-48 h-48 sm:w-56 sm:h-56 lg:w-72 lg:h-72 rounded-2xl overflow-hidden bg-white/5 border border-white/10 p-2 shadow-2xl hover:scale-[1.02] transition-transform duration-500">
-                                    <img src="${p.images && p.images.length ? p.images[0] : ''}" class="w-full h-full object-cover rounded-xl">
+                            <!-- Columna Derecha: Imagen del producto agrandada y con cinematica de tambalear -->
+                            <div class="w-full lg:w-[45%] flex items-center justify-center order-1 lg:order-2 relative z-10">
+                                <div class="relative w-56 h-56 sm:w-64 sm:h-64 lg:w-[26rem] lg:h-[26rem] rounded-[2rem] overflow-hidden bg-white/5 border border-white/10 p-2 shadow-2xl hover:scale-[1.02] transition-transform duration-500 wobble-cinematic cursor-pointer" onclick="navigate('detail', ${p.id})">
+                                    <img src="${p.images && p.images.length ? p.images[0] : ''}" class="w-full h-full object-cover rounded-[1.75rem]">
                                 </div>
                             </div>
                             
@@ -2256,20 +2215,19 @@ function renderCatalog(container) {
         return;
     }
 
-    // 1. Featured Category Block at the very top (first element)
+    // 1. Featured Category Block at the very top (first element) - Seleccionado de forma aleatoria
     let featuredCategoryHTML = '';
     if (state.categories.length > 0) {
         let featuredCat = null;
         let featuredCatProducts = [];
-        // Stable search based on filtered products length
-        const catOffset = filtered.length % state.categories.length;
-        for (let i = 0; i < state.categories.length; i++) {
-            const idx = (catOffset + i) % state.categories.length;
-            const cat = state.categories[idx];
+        // Ordenar categorías aleatoriamente para recomendar una colección distinta cada vez
+        const shuffledCats = state.categories.slice().sort(() => 0.5 - Math.random());
+        for (const cat of shuffledCats) {
             const prods = state.products.filter(p => p.categoryId == cat.id);
             if (prods.length > 0) {
                 featuredCat = cat;
-                featuredCatProducts = prods;
+                // Tomar hasta 8 productos aleatorios de esta categoría
+                featuredCatProducts = prods.slice().sort(() => 0.5 - Math.random()).slice(0, 8);
                 break;
             }
         }
@@ -2286,13 +2244,15 @@ function renderCatalog(container) {
                 </div>
                 <div class="flex gap-4 overflow-x-auto no-scrollbar pb-2 overscroll-x-contain scroll-smooth" id="featured-cat-carousel">
                     ${featuredCatProducts.map(p => `
-                        <div class="w-32 md:w-44 flex-shrink-0 flex flex-col justify-between cursor-pointer" onclick="navigate('detail', ${p.id})">
-                            <div class="aspect-[3/4] overflow-hidden bg-white rounded-2xl md:rounded-[2rem] border border-gray-100 shadow-sm relative mb-3">
+                        <div class="w-32 md:w-44 flex-shrink-0 flex flex-col justify-between cursor-pointer bg-white border border-gray-100 p-3 rounded-2xl md:rounded-[1.75rem] transition-all duration-300 hover:shadow-xl hover:border-gray-200 hover:-translate-y-1" onclick="navigate('detail', ${p.id})">
+                            <div class="aspect-square overflow-hidden bg-gray-50 border border-gray-100 shadow-sm relative mb-3 rounded-xl md:rounded-[1.25rem]">
                                 <img src="${p.images && p.images.length ? p.images[0] : ''}" class="w-full h-full object-cover transition-transform duration-500 hover:scale-105">
                             </div>
-                            <div class="px-1 text-left">
-                                <h4 class="text-[9px] md:text-xs font-black uppercase text-black line-clamp-1 leading-tight mb-1">${p.name}</h4>
-                                <span class="text-[10px] md:text-xs font-black text-black">BS ${p.price}</span>
+                            <div class="px-1 text-center flex flex-col items-center gap-1">
+                                <h4 class="text-xs md:text-sm font-black uppercase text-black line-clamp-1 leading-tight mb-1">${p.name}</h4>
+                                <div>
+                                    <span class="price-shine-move text-base md:text-lg">BS ${p.price}</span>
+                                </div>
                             </div>
                         </div>
                     `).join('')}
@@ -2339,7 +2299,7 @@ function renderCatalog(container) {
                     </div>
                     
                     <span class="text-[8px] md:text-[9px] font-black tracking-widest text-white/40 uppercase mb-1 md:mb-2">${categoryLabel}</span>
-                    <h3 class="text-lg sm:text-xl md:text-3xl font-black uppercase tracking-tighter text-white leading-[1.05] mb-4 md:mb-5">
+                    <h3 class="text-lg sm:text-xl md:text-3xl font-black uppercase tracking-normal text-white leading-[1.05] mb-4 md:mb-5">
                         ${p.name}
                     </h3>
                     
@@ -2348,8 +2308,8 @@ function renderCatalog(container) {
                         ${featuresHTML}
                     </div>
                     
-                    <div class="text-lg md:text-2xl font-black tracking-tight text-white mb-5 md:mb-6">
-                        BS ${p.price}
+                    <div class="text-center md:text-left mb-5 md:mb-6">
+                        <span class="price-shine-move-white text-xl md:text-2xl">BS ${p.price}</span>
                     </div>
                     
                     <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -2380,7 +2340,7 @@ function renderCatalog(container) {
         return `
         <div class="product-card group relative flex flex-col justify-between ${isOutOfStock ? 'opacity-80' : ''}">
             <div>
-                <div class="aspect-[3/4] overflow-hidden bg-gray-50 rounded-[1.75rem] md:rounded-[2.5rem] mb-4 md:mb-6 relative cursor-pointer shadow-sm border border-gray-100" 
+                <div class="aspect-square overflow-hidden bg-gray-50 mb-4 md:mb-6 relative cursor-pointer shadow-sm border border-gray-100" 
                      onmouseenter="${isOutOfStock ? '' : `startCatalogHoverSlide(this, '${encodeURIComponent(JSON.stringify(p.images || []))}')`}" 
                      onmouseleave="${isOutOfStock ? '' : `stopCatalogHoverSlide(this, '${p.images && p.images.length ? p.images[0] : ''}')`}"
                      onclick="navigate('detail', ${p.id})">
@@ -2399,12 +2359,11 @@ function renderCatalog(container) {
                         </button>
                     `}
                 </div>
-                <div class="flex justify-between items-start px-1 mb-4">
-                    <div class="pr-2">
-                        <h3 class="text-[10px] md:text-xs font-black uppercase text-black line-clamp-1 leading-tight mb-1">${p.name}</h3>
-                        <p class="text-[8px] font-bold opacity-40 text-black tracking-widest">${categoryLabel}</p>
+                <div class="text-center px-1 mb-4 flex flex-col items-center gap-1">
+                    <h3 class="text-xs md:text-sm font-black uppercase text-black line-clamp-1 leading-tight mb-1">${p.name}</h3>
+                    <div>
+                        <span class="price-shine-move text-base md:text-lg">BS ${p.price}</span>
                     </div>
-                    <span class="text-xs md:text-sm font-black text-black whitespace-nowrap">BS ${p.price}</span>
                 </div>
             </div>
             <!-- Botón Añadir para PC -->
@@ -2515,13 +2474,15 @@ function renderDetail(container) {
             </div>
 
             <!-- Columna Derecha: Información del producto -->
-            <div class="lg:w-1/2 flex flex-col justify-center reveal-up active" style="transition-delay: 0.2s">
-                <div class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/10 shadow-sm mb-4 w-fit">
+            <div class="lg:w-1/2 flex flex-col justify-center reveal-up active text-center items-center" style="transition-delay: 0.2s">
+                <div class="inline-flex items-center gap-2 px-4 py-2 bg-white/10 rounded-full border border-white/10 shadow-sm mb-4 w-fit mx-auto">
                     <span class="text-[9px] font-black tracking-[0.3em] text-white/85 uppercase">Emma Store • ${categoryLabel}</span>
                 </div>
                 
-                <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tighter mb-4 text-white leading-none py-1">${p.name}</h1>
-                <p class="text-2xl md:text-4xl font-black mb-6 text-white font-serif tracking-tight">BS ${p.price}</p>
+                <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-normal mb-4 text-white leading-none py-1 text-center">${p.name}</h1>
+                <p class="text-center mb-6">
+                    <span class="price-shine-move-white text-4xl md:text-6xl font-black font-serif tracking-tight">BS ${p.price}</span>
+                </p>
                 
                 ${promoCountdownHTML}
 
@@ -2542,7 +2503,7 @@ function renderDetail(container) {
                             <i class="fa-solid fa-bag-shopping"></i> Añadir a la bolsa
                         </button>
                     `}
-                    <button onclick="askInfo('${promoIdStr}')" class="btn-premium bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border-none cursor-pointer">
+                    <button onclick="askInfo('${promoIdStr}')" class="btn-premium bg-green-500 hover:bg-green-600 text-white py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border-none cursor-pointer">
                         <i class="fa-solid fa-bolt text-sm"></i> Realizar pedido
                     </button>
                 </div>
@@ -2604,17 +2565,17 @@ function renderDetail(container) {
                             <img src="${sp.images && sp.images.length ? sp.images[0] : ''}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105">
                             ${isOOS ? `<div class="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white px-2 py-1 rounded-full text-[6px] font-black uppercase tracking-wider">Agotado</div>` : ''}
                         </div>
-                        <div class="px-1 text-left">
+                        <div class="px-1 text-center flex flex-col items-center gap-1.5">
                             <span class="text-[8px] font-extrabold uppercase tracking-wider text-gray-400 block mb-1">${catSug ? catSug.name : 'Emma Store'}</span>
                             <h4 class="text-[10px] md:text-xs font-black uppercase text-black line-clamp-1 leading-tight mb-1 group-hover:text-gray-600 transition-colors">${sp.name}</h4>
-                            <div class="flex justify-between items-center mt-2">
-                                <span class="text-[10px] md:text-xs font-black text-black">BS ${sp.price}</span>
-                                ${!isOOS ? `
-                                    <button onclick="event.stopPropagation(); addToCart(${sp.id})" class="p-2 bg-black hover:bg-gray-800 text-white rounded-lg flex items-center justify-center transition-all active:scale-90 shadow-sm border-none cursor-pointer">
-                                        <i class="fa-solid fa-plus text-[8px]"></i>
-                                    </button>
-                                ` : ''}
+                            <div class="mt-1">
+                                <span class="price-shine-move text-base md:text-lg">BS ${sp.price}</span>
                             </div>
+                            ${!isOOS ? `
+                                <button onclick="event.stopPropagation(); addToCart(${sp.id})" class="mt-1 py-1.5 px-4 bg-black hover:bg-gray-800 text-white rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1 transition-all active:scale-90 shadow-sm border-none cursor-pointer">
+                                    <i class="fa-solid fa-plus"></i> Añadir
+                                </button>
+                            ` : ''}
                         </div>
                     </div>`;
                 }).join('')}
@@ -2670,9 +2631,10 @@ function renderDetail(container) {
         const titleEl = container.querySelector('h1');
         if (titleEl) {
             const text = titleEl.textContent;
-            titleEl.innerHTML = text.split('').map((ch, i) =>
-                `<span class="detail-letter" style="display:inline-block; opacity:0; transform:translateY(20px); transition: opacity 0.4s ease ${i * 0.03}s, transform 0.4s ease ${i * 0.03}s">${ch === ' ' ? '&nbsp;' : ch}</span>`
-            ).join('');
+            titleEl.innerHTML = text.split('').map((ch, i) => {
+                if (ch === ' ') return ' ';
+                return `<span class="detail-letter" style="display:inline-block; opacity:0; transform:translateY(20px); transition: opacity 0.4s ease ${i * 0.03}s, transform 0.4s ease ${i * 0.03}s">${ch}</span>`;
+            }).join('');
             setTimeout(() => {
                 titleEl.querySelectorAll('.detail-letter').forEach(el => {
                     el.style.opacity = '1';
@@ -2724,9 +2686,13 @@ window.checkout = (e) => {
     if (e && typeof e.preventDefault === 'function') e.preventDefault();
     if (state.cart.length === 0) return alert("Bolsa vacía");
 
-    // GANCHO DE AUTENTICACIÓN
-    if (!state.user && !state.isGuest) {
-        window.openLoginHookModal(() => window.checkout());
+    // Verificar si ya aceptó la privacidad una vez
+    const privacyAccepted = localStorage.getItem('emma_privacy_accepted') === 'true';
+    if (!privacyAccepted) {
+        window.openLoginHookModal(() => {
+            window.toggleCart(false);
+            window.navigate('checkout');
+        });
         return;
     }
 
@@ -2911,11 +2877,7 @@ function renderCheckout(container) {
                            class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
                 </div>
 
-                <!-- Apartamento/Suite -->
-                <div class="relative">
-                    <input type="text" id="chk-apartment" value="${apartmentVal}" placeholder="Casa, departamento, piso, etc. (opcional)" 
-                           class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xs outline-none focus:border-black transition-all font-medium">
-                </div>
+                <!-- Campo apartamento removido por solicitud del cliente -->
             </div>
 
         </div>
@@ -3179,6 +3141,23 @@ function renderCheckout(container) {
     }
 
     function renderCheckoutPaymentHTML(inZone, zones) {
+        // Sección de imagen QR de pago (oculta por defecto, solo para encomiendas)
+        const qrImageHTML = `
+            <div id="checkout-qr-container" class="hidden mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center animate-fade">
+                <p class="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-3">Escanea para pagar</p>
+                <div class="w-48 h-48 mx-auto bg-white border-2 border-gray-200 rounded-xl flex items-center justify-center overflow-hidden">
+                    <img src="assets/qr-pago.png" alt="QR de Pago" class="w-full h-full object-contain p-2" onerror="this.parentElement.innerHTML='<div class=\'flex flex-col items-center justify-center gap-2 text-gray-400\'><i class=\'fa-solid fa-qrcode text-4xl\'></i><span class=\'text-[9px] font-bold uppercase tracking-wider\'>QR de pago</span></div>'">
+                </div>
+                <p class="text-[8px] text-gray-400 font-bold mt-2">Envía el comprobante por WhatsApp</p>
+            </div>
+        `;
+
+        // Definir la función global para alternar el QR
+        window.toggleCheckoutQR = () => {
+            const el = document.getElementById('checkout-qr-container');
+            if (el) el.classList.toggle('hidden');
+        };
+
         if (inZone) {
             return `
             <div class="p-4 border border-black bg-gray-50/20 rounded-2xl flex items-center justify-between">
@@ -3203,18 +3182,22 @@ function renderCheckout(container) {
                     Solo ofrecemos contra entrega en las sucursales principales (${zonesText}). Para tu departamento se requiere <span class="text-black font-black">pago previo obligatorio</span> antes del despacho.
                 </p>
             </div>
-            <div class="p-4 border border-black bg-gray-50/20 rounded-2xl flex items-center justify-between">
+            <div class="p-4 border border-black bg-gray-50/20 rounded-2xl flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all" onclick="window.toggleCheckoutQR()">
                 <div class="flex items-center gap-3">
                     <div class="w-4 h-4 rounded-full border border-black flex items-center justify-center bg-black">
                         <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
                     </div>
                     <div class="flex flex-col text-left">
-                        <span class="text-xs font-black text-black">Transferencia Bancaria / QR</span>
+                        <span class="text-xs font-black text-black flex items-center gap-2">
+                            Transferencia Bancaria / QR
+                            <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-black text-white text-[9px] shadow-sm"><i class="fa-solid fa-qrcode"></i></span>
+                        </span>
                         <span class="text-[9px] text-gray-400 font-bold">Coordina el pago con el asesor por WhatsApp antes del envío</span>
                     </div>
                 </div>
                 <i class="fa-solid fa-qrcode text-gray-600 text-sm"></i>
             </div>
+            ${qrImageHTML}
             `;
         }
     }
@@ -3229,7 +3212,7 @@ function renderCheckout(container) {
         const address = document.getElementById('chk-address').value.trim();
         const mapsLink = document.getElementById('chk-maps-link').value.trim();
         const doorDesc = document.getElementById('chk-door-desc').value.trim();
-        const apartment = document.getElementById('chk-apartment').value.trim();
+        const apartment = '';
         const city = document.getElementById('chk-city').value.trim();
         const shipExpressEl = document.getElementById('ship-express');
         const isExpress = shipExpressEl ? shipExpressEl.checked : false;
@@ -4600,4 +4583,39 @@ window.initCategoryCarousel = (carouselEl) => {
     animationFrameId = requestAnimationFrame(scrollFn);
 };
 
-window.onload = loadData;
+// --- MODO OSCURO (DARK MODE) ---
+window.toggleDarkMode = () => {
+    const isDark = document.body.classList.toggle('dark');
+    localStorage.setItem('emma_theme', isDark ? 'dark' : 'light');
+    updateThemeIcon(isDark);
+};
+
+function updateThemeIcon(isDark) {
+    const icon = document.getElementById('theme-icon');
+    if (icon) {
+        if (isDark) {
+            icon.className = 'fa-solid fa-sun text-xs md:text-sm text-yellow-400';
+        } else {
+            icon.className = 'fa-regular fa-moon text-xs md:text-sm text-black';
+        }
+    }
+}
+
+function initTheme() {
+    const savedTheme = localStorage.getItem('emma_theme');
+    const isDark = savedTheme === 'dark';
+    if (isDark) {
+        document.body.classList.add('dark');
+    } else {
+        document.body.classList.remove('dark');
+    }
+    updateThemeIcon(isDark);
+}
+
+// Inicializar el tema de inmediato
+initTheme();
+
+window.onload = () => {
+    initTheme();
+    loadData();
+};
