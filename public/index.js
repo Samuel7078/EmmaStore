@@ -74,7 +74,8 @@ async function loadData() {
                 shipping_cost: parseFloat(storeConf.shipping_cost) || 15,
                 carrier_cost: parseFloat(storeConf.carrier_cost) || 25,
                 delivery_zones: storeConf.delivery_zones || ['Cochabamba'],
-                shipping_options: storeConf.shipping_options || []
+                shipping_options: storeConf.shipping_options || [],
+                qr_payment_url: storeConf.qr_payment_url || null
             };
         }
         state.products = p.map(prod => ({ 
@@ -3141,19 +3142,23 @@ function renderCheckout(container) {
     }
 
     function renderCheckoutPaymentHTML(inZone, zones) {
-        // Sección de imagen QR de pago (oculta por defecto, solo para encomiendas)
-        const qrImageHTML = `
+        const qrUrl = (state.storeConfig && state.storeConfig.qr_payment_url) || '';
+        const hasQR = qrUrl.trim().length > 0;
+
+        // Sección de imagen QR de pago (oculta por defecto, solo para encomiendas si hay QR configurado)
+        const qrImageHTML = hasQR ? `
             <div id="checkout-qr-container" class="hidden mt-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 text-center animate-fade">
                 <p class="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-3">Escanea para pagar</p>
                 <div class="w-48 h-48 mx-auto bg-white border-2 border-gray-200 rounded-xl flex items-center justify-center overflow-hidden">
-                    <img src="assets/qr-pago.png" alt="QR de Pago" class="w-full h-full object-contain p-2" onerror="this.parentElement.innerHTML='<div class=\'flex flex-col items-center justify-center gap-2 text-gray-400\'><i class=\'fa-solid fa-qrcode text-4xl\'></i><span class=\'text-[9px] font-bold uppercase tracking-wider\'>QR de pago</span></div>'">
+                    <img src="${qrUrl}" alt="QR de Pago" class="w-full h-full object-contain p-2">
                 </div>
                 <p class="text-[8px] text-gray-400 font-bold mt-2">Envía el comprobante por WhatsApp</p>
             </div>
-        `;
+        ` : '';
 
         // Definir la función global para alternar el QR
         window.toggleCheckoutQR = () => {
+            if (!hasQR) return;
             const el = document.getElementById('checkout-qr-container');
             if (el) el.classList.toggle('hidden');
         };
@@ -3182,7 +3187,7 @@ function renderCheckout(container) {
                     Solo ofrecemos contra entrega en las sucursales principales (${zonesText}). Para tu departamento se requiere <span class="text-black font-black">pago previo obligatorio</span> antes del despacho.
                 </p>
             </div>
-            <div class="p-4 border border-black bg-gray-50/20 rounded-2xl flex items-center justify-between cursor-pointer active:scale-[0.99] transition-all" onclick="window.toggleCheckoutQR()">
+            <div class="p-4 border border-black bg-gray-50/20 rounded-2xl flex items-center justify-between ${hasQR ? 'cursor-pointer active:scale-[0.99] transition-all' : ''}" ${hasQR ? 'onclick="window.toggleCheckoutQR()"' : ''}>
                 <div class="flex items-center gap-3">
                     <div class="w-4 h-4 rounded-full border border-black flex items-center justify-center bg-black">
                         <div class="w-1.5 h-1.5 rounded-full bg-white"></div>
@@ -3190,7 +3195,7 @@ function renderCheckout(container) {
                     <div class="flex flex-col text-left">
                         <span class="text-xs font-black text-black flex items-center gap-2">
                             Transferencia Bancaria / QR
-                            <span class="inline-flex items-center justify-center w-5 h-5 rounded bg-black text-white text-[9px] shadow-sm"><i class="fa-solid fa-qrcode"></i></span>
+                            ${hasQR ? `<span class="inline-flex items-center justify-center w-5 h-5 rounded bg-black text-white text-[9px] shadow-sm"><i class="fa-solid fa-qrcode"></i></span>` : ''}
                         </span>
                         <span class="text-[9px] text-gray-400 font-bold">Coordina el pago con el asesor por WhatsApp antes del envío</span>
                     </div>
