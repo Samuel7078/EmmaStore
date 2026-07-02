@@ -3,6 +3,51 @@ let SUPABASE_URL = '';
 let SUPABASE_ANON_KEY = '';
 let supabaseClient = null;
 
+// --- OBTENER NÚMERO DE WHATSAPP PREDETERMINADO (Socio con más productos asignados) ---
+window.getDefaultContactNumber = () => {
+    if (!state.contacts || state.contacts.length === 0) return '59178986924'; // Fallback absoluto
+    
+    // Contar cuántos productos tiene asignado cada contacto
+    const counts = {};
+    if (state.products && state.products.length > 0) {
+        state.products.forEach(p => {
+            if (p.contactId) {
+                counts[p.contactId] = (counts[p.contactId] || 0) + 1;
+            }
+        });
+    }
+    
+    let bestContact = null;
+    let maxCount = -1;
+    
+    state.contacts.forEach(c => {
+        const count = counts[c.id] || 0;
+        if (count > maxCount) {
+            maxCount = count;
+            bestContact = c;
+        }
+    });
+    
+    if (bestContact && bestContact.number) {
+        let num = bestContact.number.replace(/\D/g, '');
+        if (!num.startsWith('591') && num.length === 8) {
+            num = '591' + num;
+        }
+        return num;
+    }
+    
+    // Fallback: el primer contacto disponible
+    if (state.contacts[0] && state.contacts[0].number) {
+        let num = state.contacts[0].number.replace(/\D/g, '');
+        if (!num.startsWith('591') && num.length === 8) {
+            num = '591' + num;
+        }
+        return num;
+    }
+    
+    return '59178986924';
+};
+
 // --- ESTADO GLOBAL ---
 const state = {
     view: 'home',
@@ -86,6 +131,14 @@ async function loadData() {
         state.categories = cat;
         state.contacts = con;
         state.promotions = s;
+
+        // Actualizar enlace de WhatsApp del footer dinámicamente según el vendedor con más productos
+        try {
+            const footerWaLink = document.querySelector('a[href*="wa.me/59178986924"]');
+            if (footerWaLink) {
+                footerWaLink.href = 'https://wa.me/' + window.getDefaultContactNumber();
+            }
+        } catch (_) {}
 
         // Selección estable de categoría y producto aleatorio para la landing page
         if (state.categories.length > 0) {
@@ -1660,7 +1713,7 @@ function renderBenefits(container) {
             </div>
             
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div onclick="window.open('https://wa.me/59178986924?text=Hola%20Emma%20Store,%20necesito%20atenci%C3%B3n%20personalizada%20con%20un%20asesor', '_blank')" class="benefit-card reveal-up-d1 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all">
+                <div onclick="window.open('https://wa.me/' + window.getDefaultContactNumber() + '?text=Hola%20Emma%20Store,%20necesito%20atenci%C3%B3n%20personalizada%20con%20un%20asesor', '_blank')" class="benefit-card reveal-up-d1 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all">
                     <div class="benefit-icon bg-green-50 text-green-500">
                         <i class="fa-brands fa-whatsapp"></i>
                     </div>
@@ -1889,7 +1942,7 @@ function renderFAQ(container) {
             <!-- CTA final -->
             <div class="text-center mt-10 md:mt-14 reveal-up">
                 <p class="text-xs text-gray-500 font-medium mb-4">¿Tienes otra pregunta? ¡Escríbenos!</p>
-                <button onclick="window.open('https://wa.me/59178986924?text=Hola%20Emma%20Store,%20tengo%20una%20consulta', '_blank')" 
+                <button onclick="window.open('https://wa.me/' + window.getDefaultContactNumber() + '?text=Hola%20Emma%20Store,%20tengo%20una%20consulta', '_blank')" 
                         class="btn-premium pulse-green bg-green-500 hover:bg-green-600 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:shadow-2xl active:scale-95 inline-flex items-center gap-3 transition-all">
                     <i class="fa-brands fa-whatsapp text-lg"></i> Escribir por WhatsApp
                 </button>
@@ -2603,7 +2656,7 @@ function renderDetail(container) {
                     <p class="text-[9px] font-black uppercase tracking-[0.4em] text-gray-400 mb-1">Resolvemos tus dudas</p>
                     <h3 class="text-lg md:text-2xl font-black uppercase tracking-tighter text-black">Preguntas Frecuentes</h3>
                 </div>
-                <button onclick="window.open('https://wa.me/59178986924?text=Hola%20Emma%20Store,%20tengo%20una%20consulta', '_blank')"
+                <button onclick="window.open('https://wa.me/' + window.getDefaultContactNumber() + '?text=Hola%20Emma%20Store,%20tengo%20una%20consulta', '_blank')"
                         class="btn-premium pulse-green bg-green-500 hover:bg-green-600 text-white px-5 py-2.5 rounded-2xl text-[9px] font-black uppercase tracking-widest inline-flex items-center gap-2 transition-all active:scale-95 border-none cursor-pointer">
                     <i class="fa-brands fa-whatsapp"></i> Preguntar
                 </button>
