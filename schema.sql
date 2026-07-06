@@ -50,7 +50,7 @@ CREATE INDEX IF NOT EXISTS idx_addresses_user ON addresses(user_id);
 CREATE TABLE IF NOT EXISTS orders (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-    order_number INT NOT NULL,                      -- Número visible (#1234)
+    order_number TEXT NOT NULL,                      -- Número visible (#1234 o EMMA-XXXXXX)
     subtotal DECIMAL(10,2) NOT NULL DEFAULT 0,
     shipping_cost DECIMAL(10,2) NOT NULL DEFAULT 0,
     total DECIMAL(10,2) NOT NULL DEFAULT 0,
