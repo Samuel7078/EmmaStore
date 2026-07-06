@@ -2422,9 +2422,9 @@ function renderCatalog(container) {
             </div>
             <!-- Botón Añadir para PC -->
             ${isOutOfStock ? `
-                <button disabled class="hidden md:block w-full bg-gray-150 text-gray-400 py-3.5 rounded-2xl text-[9px] font-black uppercase tracking-widest cursor-not-allowed select-none">Agotado</button>
+                <button disabled class="hidden md:block w-full bg-gray-150 text-gray-400 py-4.5 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed select-none">Agotado</button>
             ` : `
-                <button onclick="addToCart(${p.id})" class="hidden md:block w-full bg-black text-white py-3.5 rounded-2xl text-[9px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-md hover:shadow-lg">Añadir a la bolsa</button>
+                <button onclick="addToCart(${p.id})" class="hidden md:block w-full bg-black text-white py-4.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-md hover:shadow-lg">Añadir a la bolsa</button>
             `}
         </div>`;
     }).join('');
@@ -2553,7 +2553,7 @@ function renderDetail(container) {
                             Agotado temporalmente
                         </button>
                     ` : `
-                        <button onclick="addToCart('${promoIdStr}')" class="btn-premium bg-white text-black py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border-none cursor-pointer">
+                        <button onclick="addToCart('${promoIdStr}')" class="btn-premium bg-white text-black py-4.5 md:py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border-none cursor-pointer">
                             <i class="fa-solid fa-bag-shopping"></i> Añadir a la bolsa
                         </button>
                     `}
@@ -2957,7 +2957,7 @@ function renderCheckout(container) {
 
         <!-- Botones en Mobile -->
         <div class="block lg:hidden pt-4 space-y-3">
-            <button onclick="window.submitCheckoutForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-3 shadow-lg active:scale-95">
+            <button onclick="window.submitCheckoutForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4.5 rounded-2xl font-black text-[10px] tracking-widest uppercase transition-all flex items-center justify-center gap-3 shadow-lg active:scale-95">
                 Finalizar el pedido
             </button>
             <button onclick="window.goBack()" class="w-full border-2 border-black bg-white text-black py-4.5 rounded-2xl font-black text-[10px] tracking-widest uppercase hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
@@ -3022,7 +3022,7 @@ function renderCheckout(container) {
             
             <!-- Botón Finalizar en Desktop -->
             <div class="hidden lg:block pt-4 space-y-3">
-                <button onclick="window.submitCheckoutForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-3 shadow-lg active:scale-95">
+                <button onclick="window.submitCheckoutForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4.5 md:py-5 rounded-2xl font-black text-[10px] tracking-widest uppercase transition-all flex items-center justify-center gap-3 shadow-lg active:scale-95">
                     Finalizar el pedido
                 </button>
                 <p class="text-center mt-3 text-[9px] font-bold text-gray-400 uppercase tracking-widest">
@@ -3806,8 +3806,8 @@ window.askInfo = (id) => {
         <div class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity duration-300"></div>
         <div class="relative bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl scale-95 transition-transform duration-300 border border-gray-100 flex flex-col text-center" id="quick-order-card">
             
-            <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-sm text-blue-600">
-                <i class="fa-solid fa-bolt text-2xl"></i>
+            <div class="w-16 h-16 rounded-2xl overflow-hidden mx-auto mb-5 shadow-sm border border-gray-100 flex items-center justify-center bg-gray-50">
+                <img src="${p.images[0]}" class="w-full h-full object-cover">
             </div>
             
             <h3 class="text-xs font-black uppercase tracking-wider text-black mb-3">Pedido Rápido</h3>
@@ -3818,10 +3818,10 @@ window.askInfo = (id) => {
             </p>
             
             <div class="flex gap-3">
-                <button id="quick-order-cancel" class="flex-1 border-2 border-gray-200 bg-white text-gray-400 py-3.5 rounded-2xl font-black text-[10px] tracking-widest uppercase hover:bg-gray-50 transition-all cursor-pointer">
+                <button id="quick-order-cancel" class="flex-1 border-2 border-green-200 bg-white text-green-600 py-3.5 rounded-2xl font-black text-[10px] tracking-widest uppercase hover:bg-green-50/50 transition-all cursor-pointer">
                     Cancelar
                 </button>
-                <button id="quick-order-confirm" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-2xl font-black text-[10px] tracking-widest uppercase transition-all shadow-lg active:scale-95 cursor-pointer">
+                <button id="quick-order-confirm" class="flex-1 bg-green-500 hover:bg-green-600 text-white py-3.5 rounded-2xl font-black text-[10px] tracking-widest uppercase transition-all shadow-lg active:scale-95 cursor-pointer">
                     Continuar
                 </button>
             </div>
