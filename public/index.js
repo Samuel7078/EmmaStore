@@ -2540,31 +2540,30 @@ function renderDetail(container) {
                 
                 ${promoCountdownHTML}
 
-                <div class="mb-6 md:mb-8 bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10">
+                <div class="mb-6 md:mb-8 bg-white/5 p-6 md:p-8 rounded-[2rem] border border-white/10 w-full max-w-md">
                     <h4 class="text-[10px] font-black uppercase tracking-widest text-white/50 mb-4 flex items-center gap-2">
                         <i class="fa-solid fa-circle-info"></i> Detalles del producto
                     </h4>
                     ${featuresHTML}
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div class="flex flex-col gap-3.5 w-full max-w-md mx-auto">
                     ${isOutOfStock ? `
-                        <button disabled class="w-full bg-white/10 text-white/40 border border-white/10 py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest cursor-not-allowed select-none">
+                        <button disabled class="w-full bg-white/10 text-white/40 border border-white/10 py-4 md:py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest cursor-not-allowed select-none">
                             Agotado temporalmente
                         </button>
                     ` : `
-                        <button onclick="addToCart('${promoIdStr}')" class="btn-premium bg-white text-black py-4.5 md:py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border-none cursor-pointer">
+                        <button onclick="addToCart('${promoIdStr}')" class="btn-premium w-full bg-white text-black py-4 md:py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-2 border-none cursor-pointer">
                             <i class="fa-solid fa-bag-shopping"></i> Añadir a la bolsa
                         </button>
                     `}
-                    <button onclick="askInfo('${promoIdStr}')" class="btn-premium bg-green-500 hover:bg-green-600 text-white py-4 md:py-5 rounded-2xl text-[10px] sm:text-xs font-black uppercase tracking-widest shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border-none cursor-pointer">
+                    <button onclick="askInfo('${promoIdStr}')" class="btn-premium w-full bg-green-500 hover:bg-green-600 text-white py-4 md:py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:shadow-2xl flex items-center justify-center gap-3 active:scale-95 transition-all border-none cursor-pointer">
                         <i class="fa-solid fa-bolt text-sm"></i> Realizar pedido
                     </button>
+                    <button onclick="window.goBack()" class="w-full py-4 md:py-5 bg-transparent border-2 border-white/20 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/5 transition-all active:scale-95 flex items-center justify-center gap-2 group cursor-pointer">
+                        <i class="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Volver al catálogo
+                    </button>
                 </div>
-                
-                <button onclick="window.goBack()" class="w-full py-4 md:py-5 bg-transparent border-2 border-white/20 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/5 transition-all active:scale-95 flex items-center justify-center gap-2 group cursor-pointer">
-                    <i class="fa-solid fa-arrow-left transition-transform group-hover:-translate-x-1"></i> Volver al catálogo
-                </button>
             </div>
             
         </div>
@@ -2957,7 +2956,7 @@ function renderCheckout(container) {
 
         <!-- Botones en Mobile -->
         <div class="block lg:hidden pt-4 space-y-3">
-            <button onclick="window.submitCheckoutForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4.5 rounded-2xl font-black text-[10px] tracking-widest uppercase transition-all flex items-center justify-center gap-3 shadow-lg active:scale-95">
+            <button onclick="window.submitCheckoutForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-3 shadow-lg active:scale-95">
                 Finalizar el pedido
             </button>
             <button onclick="window.goBack()" class="w-full border-2 border-black bg-white text-black py-4.5 rounded-2xl font-black text-[10px] tracking-widest uppercase hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
@@ -3022,7 +3021,7 @@ function renderCheckout(container) {
             
             <!-- Botón Finalizar en Desktop -->
             <div class="hidden lg:block pt-4 space-y-3">
-                <button onclick="window.submitCheckoutForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4.5 md:py-5 rounded-2xl font-black text-[10px] tracking-widest uppercase transition-all flex items-center justify-center gap-3 shadow-lg active:scale-95">
+                <button onclick="window.submitCheckoutForm()" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-5 rounded-2xl font-black text-xs tracking-wider uppercase transition-all flex items-center justify-center gap-3 shadow-lg active:scale-95">
                     Finalizar el pedido
                 </button>
                 <p class="text-center mt-3 text-[9px] font-bold text-gray-400 uppercase tracking-widest">
