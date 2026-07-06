@@ -862,41 +862,26 @@ async function sendOrderEmails(orderData, items) {
             }
         }
 
-        // Promesa 2: Email a admins
-        if (adminEmails.length > 0) {
-            if (emailConfig.active_client_method === 'sendpulse' && process.env.SENDPULSE_ID && process.env.SENDPULSE_SECRET) {
-                emailPromises.push(
-                    (async () => {
-                        try {
-                            const tokenRes = await fetch('https://api.sendpulse.com/oauth/access_token', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ grant_type: 'client_credentials', client_id: process.env.SENDPULSE_ID, client_secret: process.env.SENDPULSE_SECRET })
-                            });
-                            const tokenData = await tokenRes.json();
-                            if (tokenData.access_token) {
-                                const sendRes = await fetch('https://api.sendpulse.com/smtp/emails', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenData.access_token}` },
-                                    body: JSON.stringify({ email: { html: Buffer.from(adminHtml).toString('base64'), text: `Nuevo Pedido #${orderData.order_number}. Total: BOB ${orderData.total}`, subject: `¡Nuevo Pedido Recibido! #${orderData.order_number} - BOB ${orderData.total}`, from: { name: 'Emma Store Alerts', email: process.env.SENDPULSE_SENDER_EMAIL || process.env.GMAIL_USER_2 || 'pedidos@emmastore.com' }, to: adminEmails.map(email => ({ name: 'Admin', email: email.trim() })) } })
-                                });
-                                if (sendRes.ok) { console.log('Email admin enviado vía SendPulse'); await incrementEmailCount('admin'); }
-                            }
-                        } catch (e) { console.error('Error SendPulse admin:', e); }
-                    })()
-                );
-            } else if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
-                emailPromises.push(
-                    (async () => {
-                        try {
-                            const t = createGmailTransporter(process.env.GMAIL_USER, process.env.GMAIL_PASS);
-                            await t.sendMail({ from: `"Emma Store Admin" <${process.env.GMAIL_USER}>`, to: adminEmails.join(','), subject: `¡Nuevo Pedido! #${orderData.order_number} - BOB ${orderData.total}`, html: adminHtml });
-                            console.log('Email admin enviado vía Gmail');
-                            await incrementEmailCount('admin');
-                        } catch (e) { console.error('Error Gmail admin:', e); await createLog('EMAIL_ERROR', `Error email admin: ${e.message}`); }
-                    })()
-                );
-            }
+        // Promesa 2: Email a admins (Siempre Gmail)
+        if (adminEmails.length > 0 && process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+            emailPromises.push(
+                (async () => {
+                    try {
+                        const t = createGmailTransporter(process.env.GMAIL_USER, process.env.GMAIL_PASS);
+                        await t.sendMail({ 
+                            from: `"Emma Store Admin" <${process.env.GMAIL_USER}>`, 
+                            to: adminEmails.join(','), 
+                            subject: `¡Nuevo Pedido! #${orderData.order_number} - BOB ${orderData.total}`, 
+                            html: adminHtml 
+                        });
+                        console.log('Email admin enviado vía Gmail');
+                        await incrementEmailCount('admin');
+                    } catch (e) { 
+                        console.error('Error Gmail admin:', e); 
+                        await createLog('EMAIL_ERROR', `Error email admin: ${e.message}`); 
+                    }
+                })()
+            );
         }
 
         // Ejecutar todos en paralelo (no secuencial)
