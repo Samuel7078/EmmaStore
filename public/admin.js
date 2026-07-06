@@ -2201,26 +2201,104 @@ function renderDeliveryContent(container, config, options) {
 
                 <!-- QR de Pago (Para Encomiendas) -->
                 <div class="bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-sm">
-                    <label class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-2">
+                    <label class="text-[9px] font-black uppercase tracking-widest text-gray-400 block mb-3">
                         <i class="fa-solid fa-qrcode mr-1 text-green-500"></i>
-                        Imagen QR de Pago (URL)
+                        Imagen QR de Pago
                     </label>
-                    <div class="flex items-center gap-3 mb-2">
-                        <div class="flex items-center gap-2 flex-1 bg-green-50 border-2 border-transparent focus-within:border-green-400 rounded-2xl px-4 py-3 transition-all">
-                            <input type="text" id="delivery-qr-url" value="${config.qr_payment_url || ''}" placeholder="Ej: https://cloudinary.com/... o /assets/qr.png"
-                                class="flex-1 bg-transparent text-sm font-black outline-none text-black">
-                        </div>
-                        <button onclick="savePaymentQR()" class="px-6 py-3 bg-green-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-green-600 active:scale-95 transition-all cursor-pointer border-none shadow-md">
-                            Guardar QR
-                        </button>
-                    </div>
-                    <p class="text-[9px] text-gray-400 font-bold">Introduce la URL de tu imagen QR de pago. Si la dejas vacía, se deshabilitará la opción de QR en el checkout.</p>
+
                     ${config.qr_payment_url ? `
-                        <div class="mt-4 p-2 bg-gray-50 border border-gray-150 rounded-xl inline-block">
-                            <p class="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1.5 text-center">QR Activo</p>
-                            <img src="${config.qr_payment_url}" class="h-28 w-28 object-contain mx-auto bg-white border border-gray-100 rounded-lg p-1">
+                        <!-- Estado: QR Activo -->
+                        <div id="qr-active-state">
+                            <div class="flex items-start gap-4">
+                                <div class="relative group">
+                                    <div class="p-2 bg-gray-50 border border-gray-200 rounded-2xl">
+                                        <img src="${config.qr_payment_url}" class="h-36 w-36 object-contain bg-white rounded-xl p-1" id="qr-active-img">
+                                    </div>
+                                    <div class="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
+                                        <span class="text-white text-[9px] font-black uppercase tracking-widest">QR Activo</span>
+                                    </div>
+                                </div>
+                                <div class="flex-1 flex flex-col gap-2 pt-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                                        <span class="text-[10px] font-black text-green-600 uppercase tracking-widest">QR Configurado</span>
+                                    </div>
+                                    <p class="text-[9px] text-gray-400 font-bold leading-relaxed">Este QR se muestra a los clientes en el checkout para pedidos fuera de la zona de entrega.</p>
+                                    <div class="flex gap-2 mt-2">
+                                        <button onclick="window.changeQR()" class="px-4 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-gray-200 active:scale-95 transition-all cursor-pointer border-none">
+                                            <i class="fa-solid fa-arrows-rotate mr-1"></i> Cambiar
+                                        </button>
+                                        <button onclick="window.deleteQR()" class="px-4 py-2.5 bg-red-50 text-red-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-100 active:scale-95 transition-all cursor-pointer border-none">
+                                            <i class="fa-solid fa-trash mr-1"></i> Eliminar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     ` : ''}
+
+                    <!-- Estado: Sin QR / Subir nuevo -->
+                    <div id="qr-upload-state" class="${config.qr_payment_url ? 'hidden' : ''}">
+                        <!-- Preview de imagen seleccionada -->
+                        <div id="qr-preview-container" class="hidden mb-4">
+                            <div class="relative inline-block">
+                                <div class="p-2 bg-gray-50 border-2 border-dashed border-green-400 rounded-2xl">
+                                    <img id="qr-preview-img" class="h-40 w-40 object-contain bg-white rounded-xl p-1">
+                                </div>
+                                <button onclick="window.cancelQRPreview()" class="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center shadow-lg hover:bg-red-600 transition-all cursor-pointer border-none">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                            <button onclick="window.uploadQRToCloudinary()" id="qr-upload-btn" class="mt-3 w-full px-6 py-3.5 bg-green-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-green-600 active:scale-95 transition-all cursor-pointer border-none shadow-md">
+                                <i class="fa-solid fa-cloud-arrow-up mr-1.5"></i> Subir QR
+                            </button>
+                        </div>
+
+                        <!-- Dropzone -->
+                        <div id="qr-dropzone" class="border-2 border-dashed border-gray-200 rounded-2xl p-8 text-center cursor-pointer hover:border-green-400 hover:bg-green-50/30 transition-all group"
+                             onclick="document.getElementById('qr-file-input').click()"
+                             ondragover="event.preventDefault(); this.classList.add('border-green-400','bg-green-50/30');"
+                             ondragleave="this.classList.remove('border-green-400','bg-green-50/30');"
+                             ondrop="event.preventDefault(); this.classList.remove('border-green-400','bg-green-50/30'); window.handleQRDrop(event);">
+                            <div class="flex flex-col items-center gap-3">
+                                <div class="w-14 h-14 rounded-2xl bg-gray-100 group-hover:bg-green-100 flex items-center justify-center transition-all">
+                                    <i class="fa-solid fa-qrcode text-2xl text-gray-300 group-hover:text-green-500 transition-all"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-black text-gray-500">Arrastra tu imagen QR aquí</p>
+                                    <p class="text-[9px] text-gray-400 font-bold mt-1">o haz clic para seleccionar un archivo</p>
+                                </div>
+                                <span class="text-[8px] text-gray-300 font-bold uppercase tracking-widest">PNG, JPG, WEBP</span>
+                            </div>
+                        </div>
+                        <input type="file" id="qr-file-input" accept="image/*" class="hidden" onchange="window.handleQRFileSelect(event)">
+
+                        <!-- Toggle para pegar URL manual -->
+                        <div class="mt-4">
+                            <button onclick="document.getElementById('qr-url-toggle').classList.toggle('hidden')" class="text-[9px] font-bold text-gray-400 hover:text-gray-600 transition-all cursor-pointer bg-transparent border-none underline">
+                                <i class="fa-solid fa-link mr-1"></i> O pegar URL directamente
+                            </button>
+                            <div id="qr-url-toggle" class="hidden mt-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex items-center gap-2 flex-1 bg-green-50 border-2 border-transparent focus-within:border-green-400 rounded-2xl px-4 py-3 transition-all">
+                                        <input type="text" id="delivery-qr-url" value="" placeholder="Ej: https://res.cloudinary.com/..."
+                                            class="flex-1 bg-transparent text-sm font-black outline-none text-black">
+                                    </div>
+                                    <button onclick="window.savePaymentQRUrl()" class="px-5 py-3 bg-green-500 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest hover:bg-green-600 active:scale-95 transition-all cursor-pointer border-none shadow-md">
+                                        Guardar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Uploading state -->
+                    <div id="qr-uploading-state" class="hidden">
+                        <div class="flex flex-col items-center gap-3 py-8">
+                            <div class="w-10 h-10 border-[3px] border-green-500 border-t-transparent rounded-full animate-spin"></div>
+                            <p class="text-xs font-black text-gray-500" id="qr-upload-status">Subiendo imagen...</p>
+                        </div>
+                    </div>
                 </div>
                 
             </div>
@@ -2400,11 +2478,154 @@ window.saveCarrierCost = () => {
     });
 };
 
-window.savePaymentQR = () => {
+// --- QR UPLOAD MODULE ---
+
+// Variable para almacenar el archivo seleccionado
+let qrSelectedFile = null;
+
+window.handleQRFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+        showAdminToast('Solo se permiten archivos de imagen');
+        return;
+    }
+    qrSelectedFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        document.getElementById('qr-preview-img').src = e.target.result;
+        document.getElementById('qr-preview-container').classList.remove('hidden');
+        document.getElementById('qr-dropzone').classList.add('hidden');
+    };
+    reader.readAsDataURL(file);
+};
+
+window.handleQRDrop = (event) => {
+    const file = event.dataTransfer.files[0];
+    if (!file || !file.type.startsWith('image/')) {
+        showAdminToast('Solo se permiten archivos de imagen');
+        return;
+    }
+    qrSelectedFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        document.getElementById('qr-preview-img').src = e.target.result;
+        document.getElementById('qr-preview-container').classList.remove('hidden');
+        document.getElementById('qr-dropzone').classList.add('hidden');
+    };
+    reader.readAsDataURL(file);
+};
+
+window.cancelQRPreview = () => {
+    qrSelectedFile = null;
+    document.getElementById('qr-preview-container').classList.add('hidden');
+    document.getElementById('qr-dropzone').classList.remove('hidden');
+    document.getElementById('qr-file-input').value = '';
+};
+
+window.uploadQRToCloudinary = async () => {
+    if (!qrSelectedFile) {
+        showAdminToast('Selecciona una imagen primero');
+        return;
+    }
+
+    // Mostrar estado de carga
+    document.getElementById('qr-upload-state').classList.add('hidden');
+    document.getElementById('qr-uploading-state').classList.remove('hidden');
+
+    try {
+        // 1. Obtener firma del backend
+        const signRes = await fetch('/api/admin/cloudinary-sign?folder=store/qr');
+        const signData = await signRes.json();
+        if (!signData.signature) throw new Error('Error obteniendo firma');
+
+        document.getElementById('qr-upload-status').textContent = 'Subiendo a la nube...';
+
+        // 2. Subir directamente a Cloudinary
+        const formData = new FormData();
+        formData.append('file', qrSelectedFile);
+        formData.append('api_key', signData.api_key);
+        formData.append('timestamp', signData.timestamp);
+        formData.append('signature', signData.signature);
+        formData.append('folder', signData.folder);
+
+        const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${signData.cloud_name}/image/upload`, {
+            method: 'POST',
+            body: formData
+        });
+        const uploadData = await uploadRes.json();
+
+        if (!uploadData.secure_url) throw new Error(uploadData.error?.message || 'Error en la subida');
+
+        document.getElementById('qr-upload-status').textContent = 'Guardando configuración...';
+
+        // 3. Guardar la URL en store_config
+        const saveRes = await fetch('/api/admin/store-config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ qr_payment_url: uploadData.secure_url })
+        });
+        
+        if (!saveRes.ok) throw new Error('Error guardando configuración');
+
+        showAdminToast('✓ QR de pago subido y configurado');
+        qrSelectedFile = null;
+        refreshDeliveryDataSilently();
+    } catch (err) {
+        console.error('Error uploading QR:', err);
+        showAdminToast('Error: ' + err.message);
+        // Volver al estado de upload
+        document.getElementById('qr-uploading-state').classList.add('hidden');
+        document.getElementById('qr-upload-state').classList.remove('hidden');
+    }
+};
+
+window.changeQR = () => {
+    // Ocultar estado activo, mostrar upload
+    const activeState = document.getElementById('qr-active-state');
+    if (activeState) activeState.classList.add('hidden');
+    document.getElementById('qr-upload-state').classList.remove('hidden');
+    window.cancelQRPreview();
+};
+
+window.deleteQR = async () => {
+    if (!confirm('¿Eliminar el QR de pago? Los clientes ya no verán la opción de QR en el checkout.')) return;
+    
+    try {
+        // Intentar eliminar de Cloudinary (si es una URL de Cloudinary)
+        const activeImg = document.getElementById('qr-active-img');
+        const currentUrl = activeImg ? activeImg.src : '';
+        if (currentUrl.includes('cloudinary.com')) {
+            try {
+                await fetch('/api/admin/cloudinary-delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: currentUrl })
+                });
+            } catch (_) { /* No es crítico si falla la eliminación de Cloudinary */ }
+        }
+
+        // Limpiar la URL en store_config
+        const res = await fetch('/api/admin/store-config', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ qr_payment_url: '' })
+        });
+
+        if (!res.ok) throw new Error('Error eliminando QR');
+
+        showAdminToast('✓ QR de pago eliminado');
+        refreshDeliveryDataSilently();
+    } catch (err) {
+        showAdminToast('Error: ' + err.message);
+    }
+};
+
+window.savePaymentQRUrl = () => {
     const qrUrl = document.getElementById('delivery-qr-url').value.trim();
     
     sendWithProgress('/api/admin/store-config', 'PUT', { qr_payment_url: qrUrl }, () => {
-        showAdminToast('✓ QR de pago configurado con éxito');
+        showAdminToast(qrUrl ? '✓ QR de pago configurado con éxito' : '✓ QR de pago desactivado');
         refreshDeliveryDataSilently();
     });
 };

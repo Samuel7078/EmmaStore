@@ -665,16 +665,18 @@ app.get('/api/user/orders', requireAuth, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.GMAIL_USER,
-        pass: process.env.GMAIL_PASS
-    },
-    connectionTimeout: 2000,
-    greetingTimeout: 2000,
-    socketTimeout: 3000
-});
+// --- HELPER: Crear transporter Gmail bajo demanda (compatible con Vercel Serverless) ---
+function createGmailTransporter(user, pass) {
+    return nodemailer.createTransport({
+        service: 'gmail',
+        auth: { user, pass },
+        pool: false,
+        connectionTimeout: 10000,
+        greetingTimeout: 10000,
+        socketTimeout: 15000,
+        tls: { rejectUnauthorized: false }
+    });
+}
 
 
 async function sendOrderEmails(orderData, items) {
@@ -798,13 +800,7 @@ async function sendOrderEmails(orderData, items) {
                 const passMail = process.env.GMAIL_PASS_2 || process.env.GMAIL_PASS;
                 if (userMail && passMail) {
                     try {
-                        const clientTransporter = nodemailer.createTransport({
-                            service: 'gmail',
-                            auth: {
-                                user: userMail,
-                                pass: passMail
-                            }
-                        });
+                        const clientTransporter = createGmailTransporter(userMail, passMail);
                         
                         const clientMailOptions = {
                             from: `"Emma Store" <${userMail}>`,
@@ -956,7 +952,8 @@ async function sendOrderEmails(orderData, items) {
                     html: adminHtml
                 };
                 try {
-                    const info = await transporter.sendMail(mailOptions);
+                    const adminTransporter = createGmailTransporter(process.env.GMAIL_USER, process.env.GMAIL_PASS);
+                    const info = await adminTransporter.sendMail(mailOptions);
                     console.log("Email a admins enviado vía Gmail SMTP:", info.response);
                     await incrementEmailCount('admin');
                 } catch (gmError) {
@@ -1268,7 +1265,8 @@ app.post('/api/admin/emails/send-otp', async (req, res) => {
             </div>
         `;
         
-        await transporter.sendMail({
+        const otpTransporter = createGmailTransporter(process.env.GMAIL_USER, process.env.GMAIL_PASS);
+        await otpTransporter.sendMail({
             from: '"Emma Store Admin" <' + process.env.GMAIL_USER + '>',
             to: cleanEmail,
             subject: `Código de verificación: ${otpCode} — Emma Store Admin`,
@@ -1382,6 +1380,41 @@ app.put('/api/admin/store-config', async (req, res) => {
         values.push(1);
         await pool.query(`UPDATE store_config SET ${updates.join(', ')} WHERE id = ?`, values);
         await createLog("CONFIG_ENTREGA", `Actualizado: ${updates.join(', ')}`);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- ADMIN: Firma para subida directa a Cloudinary (QR, etc.) ---
+app.get('/api/admin/cloudinary-sign', (req, res) => {
+    try {
+        const timestamp = Math.round(Date.now() / 1000);
+        const folder = req.query.folder || 'store/qr';
+        const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
+        const signature = require('crypto')
+            .createHash('sha1')
+            .update(paramsToSign + process.env.CLOUDINARY_API_SECRET)
+            .digest('hex');
+        
+        res.json({
+            signature,
+            timestamp,
+            folder,
+            api_key: process.env.CLOUDINARY_API_KEY,
+            cloud_name: process.env.CLOUDINARY_CLOUD_NAME
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// --- ADMIN: Eliminar imagen de Cloudinary por URL ---
+app.post('/api/admin/cloudinary-delete', async (req, res) => {
+    try {
+        const { url } = req.body;
+        if (!url) return res.status(400).json({ error: 'URL requerida' });
+        // Extraer public_id de la URL de Cloudinary
+        const match = url.match(/upload\/(?:v\d+\/)?(.+?)(?:\.[a-z]+)?$/);
+        if (!match) return res.status(400).json({ error: 'URL de Cloudinary inválida' });
+        const publicId = match[1];
+        await cloudinary.uploader.destroy(publicId);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
