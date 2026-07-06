@@ -681,287 +681,226 @@ function createGmailTransporter(user, pass) {
 
 async function sendOrderEmails(orderData, items) {
     try {
-        // 1. Enviar a cliente
-        if (orderData.contact_email) {
-            const itemsHtml = items.map(i => `
-                <tr>
-                    <td style="padding: 10px; border-bottom: 1px solid #eaeaea;">${i.product_name || i.name}</td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: center;">${i.quantity}</td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: right;">BOB ${(i.price * i.quantity).toFixed(2)}</td>
-                </tr>
-            `).join('');
-            
-            const emailHtml = `
-                <div style="font-family: Arial, sans-serif; max-width: 650px; margin: auto; border: 1px solid #eaeaea; border-radius: 12px; overflow: hidden; color: #333;">
-                    <div style="background-color: #000; color: #fff; padding: 25px; text-align: center;">
-                        <h2 style="margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 2px;">¡Gracias por tu compra, ${orderData.contact_name}!</h2>
-                        <p style="margin: 5px 0 0 0; color: #aaa;">Pedido #${orderData.order_number}</p>
-                    </div>
-                    
-                    <div style="padding: 30px;">
-                        <p style="font-size: 16px;">Hemos recibido tu pedido exitosamente y ya lo estamos preparando.</p>
-                        
-                        <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 30px;">Resumen de tu Pedido</h3>
-                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                            <thead>
-                                <tr style="background-color: #f9f9f9; text-transform: uppercase; font-size: 12px;">
-                                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #eaeaea;">Producto</th>
-                                    <th style="padding: 10px; text-align: center; border-bottom: 2px solid #eaeaea;">Cant.</th>
-                                    <th style="padding: 10px; text-align: right; border-bottom: 2px solid #eaeaea;">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${itemsHtml}
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Subtotal</td>
-                                    <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.subtotal).toFixed(2)}</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Envío</td>
-                                    <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.shipping_cost).toFixed(2)}</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="2" style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">Total</td>
-                                    <td style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">BOB ${Number(orderData.total).toFixed(2)}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
+        // Pre-fetch config y admin emails en paralelo (no secuencial)
+        const [emailConfig, [adminRows]] = await Promise.all([
+            getEmailConfig(),
+            pool.query("SELECT email FROM admin_emails")
+        ]);
+        const adminEmails = adminRows.map(r => r.email);
 
-                        <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 30px;">Detalles de Entrega</h3>
-                        <p style="margin: 5px 0;"><strong>Dirección:</strong> ${orderData.shipping_address}</p>
-                        <p style="margin: 5px 0;"><strong>Ciudad:</strong> ${orderData.shipping_city}</p>
-                        <p style="margin: 15px 0;">Te contactaremos pronto por WhatsApp para coordinar la entrega.</p>
-                        
-                        <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eaeaea;">
-                            <p style="color: #666; font-size: 12px; margin-bottom: 10px; line-height: 1.5;">
-                                En caso de algún problema o si deseas cancelar tu pedido, <br>
-                                <a href="https://wa.me/${(orderData.seller_number || '').replace(/\D/g, '')}?text=${encodeURIComponent('Hola, tengo un problema con mi pedido #' + orderData.order_number)}" style="color: #000; font-weight: bold; text-decoration: underline;">escríbenos por WhatsApp aquí</a>.
-                            </p>
-                            <p style="color: #999; font-size: 11px; margin: 0;">Emma Store Bolivia</p>
-                        </div>
+        // Construir HTML del cliente
+        const itemsHtml = items.map(i => `
+            <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #eaeaea;">${i.product_name || i.name}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: center;">${i.quantity}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: right;">BOB ${(i.price * i.quantity).toFixed(2)}</td>
+            </tr>
+        `).join('');
+
+        const emailHtml = `
+            <div style="font-family: Arial, sans-serif; max-width: 650px; margin: auto; border: 1px solid #eaeaea; border-radius: 12px; overflow: hidden; color: #333;">
+                <div style="background-color: #000; color: #fff; padding: 25px; text-align: center;">
+                    <h2 style="margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 2px;">¡Gracias por tu compra, ${orderData.contact_name}!</h2>
+                    <p style="margin: 5px 0 0 0; color: #aaa;">Pedido #${orderData.order_number}</p>
+                </div>
+                
+                <div style="padding: 30px;">
+                    <p style="font-size: 16px;">Hemos recibido tu pedido exitosamente y ya lo estamos preparando.</p>
+                    
+                    <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 30px;">Resumen de tu Pedido</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <thead>
+                            <tr style="background-color: #f9f9f9; text-transform: uppercase; font-size: 12px;">
+                                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #eaeaea;">Producto</th>
+                                <th style="padding: 10px; text-align: center; border-bottom: 2px solid #eaeaea;">Cant.</th>
+                                <th style="padding: 10px; text-align: right; border-bottom: 2px solid #eaeaea;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsHtml}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Subtotal</td>
+                                <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.subtotal).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Envío</td>
+                                <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.shipping_cost).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">Total</td>
+                                <td style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">BOB ${Number(orderData.total).toFixed(2)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 30px;">Detalles de Entrega</h3>
+                    <p style="margin: 5px 0;"><strong>Dirección:</strong> ${orderData.shipping_address}</p>
+                    <p style="margin: 5px 0;"><strong>Ciudad:</strong> ${orderData.shipping_city}</p>
+                    <p style="margin: 15px 0;">Te contactaremos pronto por WhatsApp para coordinar la entrega.</p>
+                    
+                    <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #eaeaea;">
+                        <p style="color: #666; font-size: 12px; margin-bottom: 10px; line-height: 1.5;">
+                            En caso de algún problema o si deseas cancelar tu pedido, <br>
+                            <a href="https://wa.me/${(orderData.seller_number || '').replace(/\D/g, '')}?text=${encodeURIComponent('Hola, tengo un problema con mi pedido #' + orderData.order_number)}" style="color: #000; font-weight: bold; text-decoration: underline;">escríbenos por WhatsApp aquí</a>.
+                        </p>
+                        <p style="color: #999; font-size: 11px; margin: 0;">Emma Store Bolivia</p>
                     </div>
                 </div>
-            `;
+            </div>
+        `;
 
-            const emailConfig = await getEmailConfig();
+        // Construir HTML del admin
+        const adminUrl = process.env.ADMIN_URL || 'https://emmastore.qzz.io/admin.html';
+        const itemsAdminHtml = items.map(i => `
+            <tr>
+                <td style="padding: 10px; border-bottom: 1px solid #eaeaea;">${i.product_name || i.name}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: center;">${i.quantity}</td>
+                <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: right;">BOB ${(i.price * i.quantity).toFixed(2)}</td>
+            </tr>
+        `).join('');
 
-            if (emailConfig.active_client_method === 'sendpulse' && process.env.SENDPULSE_ID && process.env.SENDPULSE_SECRET) {
-                try {
-                    // Obtener Token
-                    const tokenRes = await fetch('https://api.sendpulse.com/oauth/access_token', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            grant_type: 'client_credentials',
-                            client_id: process.env.SENDPULSE_ID,
-                            client_secret: process.env.SENDPULSE_SECRET
-                        })
-                    });
-                    const tokenData = await tokenRes.json();
+        const adminHtml = `
+            <div style="font-family: Arial, sans-serif; max-width: 650px; margin: auto; border: 1px solid #eaeaea; border-radius: 12px; overflow: hidden; color: #333;">
+                <div style="background-color: #000; color: #fff; padding: 25px; text-align: center;">
+                    <h2 style="margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 2px;">Nuevo Pedido Recibido</h2>
+                    <p style="margin: 5px 0 0 0; color: #aaa;">Pedido #${orderData.order_number}</p>
+                </div>
+                
+                <div style="padding: 30px;">
+                    <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 0;">Resumen de Productos</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <thead>
+                            <tr style="background-color: #f9f9f9; text-transform: uppercase; font-size: 12px;">
+                                <th style="padding: 10px; text-align: left; border-bottom: 2px solid #eaeaea;">Producto</th>
+                                <th style="padding: 10px; text-align: center; border-bottom: 2px solid #eaeaea;">Cant.</th>
+                                <th style="padding: 10px; text-align: right; border-bottom: 2px solid #eaeaea;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${itemsAdminHtml}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Subtotal</td>
+                                <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.subtotal).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Envío</td>
+                                <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.shipping_cost).toFixed(2)}</td>
+                            </tr>
+                            <tr>
+                                <td colspan="2" style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">Total</td>
+                                <td style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">BOB ${Number(orderData.total).toFixed(2)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+
+                    <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px;">Datos del Cliente</h3>
+                    <p style="margin: 5px 0;"><strong>Nombre:</strong> ${orderData.contact_name}</p>
+                    <p style="margin: 5px 0;"><strong>Celular:</strong> <a href="https://wa.me/${(orderData.contact_phone || '').replace(/\D/g, '')}" style="color: #25D366; text-decoration: none; font-weight: bold;">${orderData.contact_phone}</a></p>
+                    <p style="margin: 5px 0;"><strong>Correo:</strong> ${orderData.contact_email}</p>
+
+                    <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 20px;">Datos de Entrega</h3>
+                    <p style="margin: 5px 0;"><strong>Ciudad:</strong> ${orderData.shipping_city} / ${orderData.shipping_department}</p>
+                    <p style="margin: 5px 0;"><strong>Dirección:</strong> ${orderData.shipping_address}</p>
+                    ${orderData.shipping_apartment ? `<p style="margin: 5px 0;"><strong>Detalle/Piso:</strong> ${orderData.shipping_apartment}</p>` : ''}
+                    ${orderData.shipping_door_desc ? `<p style="margin: 5px 0;"><strong>Fachada:</strong> ${orderData.shipping_door_desc}</p>` : ''}
+                    ${orderData.shipping_maps_link ? `<p style="margin: 5px 0;"><strong>Google Maps:</strong> <a href="${orderData.shipping_maps_link}" style="color: #0066cc;">Ver ubicación</a></p>` : ''}
                     
-                    if (tokenData.access_token) {
-                        const emailPayload = {
-                            email: {
-                                html: Buffer.from(emailHtml).toString('base64'),
-                                text: `Pedido #${orderData.order_number} confirmado. Total: BOB ${orderData.total}`,
-                                subject: `Confirmación de pedido #${orderData.order_number} - Emma Store`,
-                                from: {
-                                    name: 'Emma Store',
-                                    email: process.env.SENDPULSE_SENDER_EMAIL || process.env.GMAIL_USER_2 || 'pedidos@emmastore.com'
-                                },
-                                to: [{ name: orderData.contact_name, email: orderData.contact_email }]
+                    <p style="margin: 20px 0 5px 0;"><strong>Vendedor asignado:</strong> ${orderData.seller_name}</p>
+
+                    <div style="text-align: center; margin-top: 40px;">
+                        <a href="${adminUrl}?order=${orderData.order_number}" style="display: inline-block; padding: 15px 30px; background-color: #000; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Ver Detalles en Admin Panel</a>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // --- ENVIAR AMBOS CORREOS EN PARALELO ---
+        const emailPromises = [];
+
+        // Promesa 1: Email al cliente
+        if (orderData.contact_email) {
+            if (emailConfig.active_client_method === 'sendpulse' && process.env.SENDPULSE_ID && process.env.SENDPULSE_SECRET) {
+                emailPromises.push(
+                    (async () => {
+                        try {
+                            const tokenRes = await fetch('https://api.sendpulse.com/oauth/access_token', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ grant_type: 'client_credentials', client_id: process.env.SENDPULSE_ID, client_secret: process.env.SENDPULSE_SECRET })
+                            });
+                            const tokenData = await tokenRes.json();
+                            if (tokenData.access_token) {
+                                const sendRes = await fetch('https://api.sendpulse.com/smtp/emails', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenData.access_token}` },
+                                    body: JSON.stringify({ email: { html: Buffer.from(emailHtml).toString('base64'), text: `Pedido #${orderData.order_number} confirmado. Total: BOB ${orderData.total}`, subject: `Confirmación de pedido #${orderData.order_number} - Emma Store`, from: { name: 'Emma Store', email: process.env.SENDPULSE_SENDER_EMAIL || process.env.GMAIL_USER_2 || 'pedidos@emmastore.com' }, to: [{ name: orderData.contact_name, email: orderData.contact_email }] } })
+                                });
+                                if (sendRes.ok) { await incrementEmailCount('sendpulse'); console.log('Email cliente enviado vía SendPulse'); }
                             }
-                        };
-                        
-                        const sendRes = await fetch('https://api.sendpulse.com/smtp/emails', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${tokenData.access_token}`
-                            },
-                            body: JSON.stringify(emailPayload)
-                        });
-                        
-                        const sendData = await sendRes.json();
-                        console.log('Sendpulse API result:', sendData);
-                        if (sendRes.ok) {
-                            await incrementEmailCount('sendpulse');
-                        }
-                    } else {
-                        console.error("Error obteniendo token de SendPulse:", tokenData);
-                    }
-                } catch (spError) {
-                    console.error("Error al enviar SendPulse vía API:", spError);
-                }
+                        } catch (e) { console.error('Error SendPulse cliente:', e); }
+                    })()
+                );
             } else {
                 const userMail = process.env.GMAIL_USER_2 || process.env.GMAIL_USER;
                 const passMail = process.env.GMAIL_PASS_2 || process.env.GMAIL_PASS;
                 if (userMail && passMail) {
-                    try {
-                        const clientTransporter = createGmailTransporter(userMail, passMail);
-                        
-                        const clientMailOptions = {
-                            from: `"Emma Store" <${userMail}>`,
-                            to: orderData.contact_email,
-                            subject: `Confirmación de pedido #${orderData.order_number} - Emma Store`,
-                            html: emailHtml
-                        };
-                        
-                        const info = await clientTransporter.sendMail(clientMailOptions);
-                        console.log("Email cliente enviado:", info.response);
-                        await incrementEmailCount('gmail2');
-                    } catch (gmError) {
-                        console.error("Error enviando email al cliente:", gmError);
-                        await createLog("EMAIL_ERROR", `Error enviando email de confirmacion a cliente (${orderData.contact_email}): ${gmError.message}`);
-                    }
-                } else {
-                    console.warn("No se configuraron credenciales SMTP para enviar confirmación al cliente.");
-                    await createLog("EMAIL_WARNING", `No se configuró GMAIL_USER o GMAIL_USER_2 para enviar confirmación al cliente para el pedido ${orderData.order_number}`);
+                    emailPromises.push(
+                        (async () => {
+                            try {
+                                const t = createGmailTransporter(userMail, passMail);
+                                await t.sendMail({ from: `"Emma Store" <${userMail}>`, to: orderData.contact_email, subject: `Confirmación de pedido #${orderData.order_number} - Emma Store`, html: emailHtml });
+                                console.log('Email cliente enviado vía Gmail');
+                                await incrementEmailCount('gmail2');
+                            } catch (e) { console.error('Error Gmail cliente:', e); await createLog('EMAIL_ERROR', `Error email cliente (${orderData.contact_email}): ${e.message}`); }
+                        })()
+                    );
                 }
             }
         }
 
-        // 2. Enviar a admins
-        const [adminRows] = await pool.query("SELECT email FROM admin_emails");
-        const adminEmails = adminRows.map(r => r.email);
-        
+        // Promesa 2: Email a admins
         if (adminEmails.length > 0) {
-            const adminUrl = process.env.ADMIN_URL || 'https://emmastore.qzz.io/admin.html';
-            const itemsAdminHtml = items.map(i => `
-                <tr>
-                    <td style="padding: 10px; border-bottom: 1px solid #eaeaea;">${i.product_name || i.name}</td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: center;">${i.quantity}</td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eaeaea; text-align: right;">BOB ${(i.price * i.quantity).toFixed(2)}</td>
-                </tr>
-            `).join('');
-
-            const adminHtml = `
-                <div style="font-family: Arial, sans-serif; max-width: 650px; margin: auto; border: 1px solid #eaeaea; border-radius: 12px; overflow: hidden; color: #333;">
-                    <div style="background-color: #000; color: #fff; padding: 25px; text-align: center;">
-                        <h2 style="margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 2px;">Nuevo Pedido Recibido</h2>
-                        <p style="margin: 5px 0 0 0; color: #aaa;">Pedido #${orderData.order_number}</p>
-                    </div>
-                    
-                    <div style="padding: 30px;">
-                        <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 0;">Resumen de Productos</h3>
-                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                            <thead>
-                                <tr style="background-color: #f9f9f9; text-transform: uppercase; font-size: 12px;">
-                                    <th style="padding: 10px; text-align: left; border-bottom: 2px solid #eaeaea;">Producto</th>
-                                    <th style="padding: 10px; text-align: center; border-bottom: 2px solid #eaeaea;">Cant.</th>
-                                    <th style="padding: 10px; text-align: right; border-bottom: 2px solid #eaeaea;">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${itemsAdminHtml}
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Subtotal</td>
-                                    <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.subtotal).toFixed(2)}</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="2" style="padding: 10px; text-align: right; color: #666;">Envío</td>
-                                    <td style="padding: 10px; text-align: right; color: #666;">BOB ${Number(orderData.shipping_cost).toFixed(2)}</td>
-                                </tr>
-                                <tr>
-                                    <td colspan="2" style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">Total</td>
-                                    <td style="padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">BOB ${Number(orderData.total).toFixed(2)}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-
-                        <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px;">Datos del Cliente</h3>
-                        <p style="margin: 5px 0;"><strong>Nombre:</strong> ${orderData.contact_name}</p>
-                        <p style="margin: 5px 0;"><strong>Celular:</strong> <a href="https://wa.me/${(orderData.contact_phone || '').replace(/\D/g, '')}" style="color: #25D366; text-decoration: none; font-weight: bold;">${orderData.contact_phone}</a></p>
-                        <p style="margin: 5px 0;"><strong>Correo:</strong> ${orderData.contact_email}</p>
-
-                        <h3 style="text-transform: uppercase; border-bottom: 2px solid #000; padding-bottom: 10px; margin-top: 20px;">Datos de Entrega</h3>
-                        <p style="margin: 5px 0;"><strong>Ciudad:</strong> ${orderData.shipping_city} / ${orderData.shipping_department}</p>
-                        <p style="margin: 5px 0;"><strong>Dirección:</strong> ${orderData.shipping_address}</p>
-                        ${orderData.shipping_apartment ? `<p style="margin: 5px 0;"><strong>Detalle/Piso:</strong> ${orderData.shipping_apartment}</p>` : ''}
-                        ${orderData.shipping_door_desc ? `<p style="margin: 5px 0;"><strong>Fachada:</strong> ${orderData.shipping_door_desc}</p>` : ''}
-                        ${orderData.shipping_maps_link ? `<p style="margin: 5px 0;"><strong>Google Maps:</strong> <a href="${orderData.shipping_maps_link}" style="color: #0066cc;">Ver ubicación</a></p>` : ''}
-                        
-                        <p style="margin: 20px 0 5px 0;"><strong>Vendedor asignado:</strong> ${orderData.seller_name}</p>
-
-                        <div style="text-align: center; margin-top: 40px;">
-                            <a href="${adminUrl}?order=${orderData.order_number}" style="display: inline-block; padding: 15px 30px; background-color: #000; color: #fff; text-decoration: none; border-radius: 8px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px;">Ver Detalles en Admin Panel</a>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            let sentViaSendPulse = false;
             if (emailConfig.active_client_method === 'sendpulse' && process.env.SENDPULSE_ID && process.env.SENDPULSE_SECRET) {
-                try {
-                    const tokenRes = await fetch('https://api.sendpulse.com/oauth/access_token', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            grant_type: 'client_credentials',
-                            client_id: process.env.SENDPULSE_ID,
-                            client_secret: process.env.SENDPULSE_SECRET
-                        })
-                    });
-                    const tokenData = await tokenRes.json();
-                    
-                    if (tokenData.access_token) {
-                        const adminPayload = {
-                            email: {
-                                html: Buffer.from(adminHtml).toString('base64'),
-                                text: `Nuevo Pedido #${orderData.order_number}. Total: BOB ${orderData.total}`,
-                                subject: `¡Nuevo Pedido Recibido! #${orderData.order_number} - BOB ${orderData.total}`,
-                                from: {
-                                    name: 'Emma Store Alerts',
-                                    email: process.env.SENDPULSE_SENDER_EMAIL || process.env.GMAIL_USER_2 || 'pedidos@emmastore.com'
-                                },
-                                to: adminEmails.map(email => ({ name: 'Admin', email: email.trim() }))
+                emailPromises.push(
+                    (async () => {
+                        try {
+                            const tokenRes = await fetch('https://api.sendpulse.com/oauth/access_token', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ grant_type: 'client_credentials', client_id: process.env.SENDPULSE_ID, client_secret: process.env.SENDPULSE_SECRET })
+                            });
+                            const tokenData = await tokenRes.json();
+                            if (tokenData.access_token) {
+                                const sendRes = await fetch('https://api.sendpulse.com/smtp/emails', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${tokenData.access_token}` },
+                                    body: JSON.stringify({ email: { html: Buffer.from(adminHtml).toString('base64'), text: `Nuevo Pedido #${orderData.order_number}. Total: BOB ${orderData.total}`, subject: `¡Nuevo Pedido Recibido! #${orderData.order_number} - BOB ${orderData.total}`, from: { name: 'Emma Store Alerts', email: process.env.SENDPULSE_SENDER_EMAIL || process.env.GMAIL_USER_2 || 'pedidos@emmastore.com' }, to: adminEmails.map(email => ({ name: 'Admin', email: email.trim() })) } })
+                                });
+                                if (sendRes.ok) { console.log('Email admin enviado vía SendPulse'); await incrementEmailCount('admin'); }
                             }
-                        };
-                        
-                        const sendRes = await fetch('https://api.sendpulse.com/smtp/emails', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${tokenData.access_token}`
-                            },
-                            body: JSON.stringify(adminPayload)
-                        });
-                        
-                        if (sendRes.ok) {
-                            console.log("Email a admins enviado vía SendPulse API");
-                            sentViaSendPulse = true;
+                        } catch (e) { console.error('Error SendPulse admin:', e); }
+                    })()
+                );
+            } else if (process.env.GMAIL_USER && process.env.GMAIL_PASS) {
+                emailPromises.push(
+                    (async () => {
+                        try {
+                            const t = createGmailTransporter(process.env.GMAIL_USER, process.env.GMAIL_PASS);
+                            await t.sendMail({ from: `"Emma Store Admin" <${process.env.GMAIL_USER}>`, to: adminEmails.join(','), subject: `¡Nuevo Pedido! #${orderData.order_number} - BOB ${orderData.total}`, html: adminHtml });
+                            console.log('Email admin enviado vía Gmail');
                             await incrementEmailCount('admin');
-                        } else {
-                            console.error("Error al enviar alerta a admin vía SendPulse API, status:", sendRes.status);
-                        }
-                    }
-                } catch (spAdminError) {
-                    console.error("Error al enviar alerta de admin vía SendPulse:", spAdminError);
-                }
-            }
-
-            if (!sentViaSendPulse && process.env.GMAIL_USER && process.env.GMAIL_PASS) {
-                const mailOptions = {
-                    from: '"Emma Store Admin" <' + process.env.GMAIL_USER + '>',
-                    to: adminEmails.join(','),
-                    subject: `¡Nuevo Pedido! #${orderData.order_number} - BOB ${orderData.total}`,
-                    html: adminHtml
-                };
-                try {
-                    const adminTransporter = createGmailTransporter(process.env.GMAIL_USER, process.env.GMAIL_PASS);
-                    const info = await adminTransporter.sendMail(mailOptions);
-                    console.log("Email a admins enviado vía Gmail SMTP:", info.response);
-                    await incrementEmailCount('admin');
-                } catch (gmError) {
-                    console.error("Error enviando email admin vía SMTP:", gmError);
-                    await createLog("EMAIL_ERROR", `Error enviando email de alerta al admin vía SMTP: ${gmError.message}`);
-                }
+                        } catch (e) { console.error('Error Gmail admin:', e); await createLog('EMAIL_ERROR', `Error email admin: ${e.message}`); }
+                    })()
+                );
             }
         }
+
+        // Ejecutar todos en paralelo (no secuencial)
+        await Promise.allSettled(emailPromises);
     } catch (err) {
         console.error("Error in sendOrderEmails:", err);
     }
@@ -1015,10 +954,11 @@ app.post('/api/public/orders', async (req, res) => {
             await supabaseAdmin.from('order_items').insert(orderItems);
         }
 
-        // Envía el correo usando el registro recién creado
-        await sendOrderEmails(order, items);
-        
+        // Responder al cliente PRIMERO (antes de enviar correos)
         res.json({ success: true, order });
+
+        // Enviar correos DESPUÉS (la función sigue viva en Vercel)
+        sendOrderEmails(order, items).catch(e => console.error('Error async emails:', e));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1076,10 +1016,11 @@ app.post('/api/user/orders', requireAuth, async (req, res) => {
         
         if (itemsError) return res.status(400).json({ error: itemsError.message });
         
-        // Enviar correos de confirmación (await es necesario en Vercel Serverless)
-        await sendOrderEmails(order, items);
-        
+        // Responder al cliente PRIMERO
         res.json({ success: true, order });
+        
+        // Enviar correos DESPUÉS (la función sigue viva en Vercel)
+        sendOrderEmails(order, items).catch(e => console.error('Error async emails:', e));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
