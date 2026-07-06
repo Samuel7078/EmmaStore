@@ -1003,9 +1003,9 @@ app.post('/api/user/orders', requireAuth, async (req, res) => {
         // Insertar los items del pedido
         const orderItems = items.map(item => ({
             order_id: order.id,
-            product_id: item.product_id || item.id,
-            product_name: item.name,
-            product_image: item.images ? item.images[0] : item.product_image,
+            product_id: item.product_id || item.id || null,
+            product_name: item.product_name || item.name,
+            product_image: item.images ? item.images[0] : item.product_image || '',
             price: item.price,
             quantity: item.quantity
         }));
