@@ -30,7 +30,11 @@ const dbConfig = {
     port: parseInt(process.env.DB_PORT),
     ssl: { rejectUnauthorized: false },
     waitForConnections: true,
-    connectionLimit: 10
+    connectionLimit: 10,
+    connectTimeout: 5000,
+    idleTimeout: 10000,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000
 };
 
 const pool = mysql.createPool(dbConfig);
@@ -939,11 +943,10 @@ app.post('/api/public/orders', async (req, res) => {
             await supabaseAdmin.from('order_items').insert(orderItems);
         }
 
-        // Responder al cliente PRIMERO (antes de enviar correos)
+        // Enviar correos y esperar a que se completen antes de responder (esencial en Vercel Serverless)
+        await sendOrderEmails(order, items);
+        
         res.json({ success: true, order });
-
-        // Enviar correos DESPUÉS (la función sigue viva en Vercel)
-        sendOrderEmails(order, items).catch(e => console.error('Error async emails:', e));
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -1001,11 +1004,10 @@ app.post('/api/user/orders', requireAuth, async (req, res) => {
         
         if (itemsError) return res.status(400).json({ error: itemsError.message });
         
-        // Responder al cliente PRIMERO
-        res.json({ success: true, order });
+        // Enviar correos y esperar a que se completen antes de responder (esencial en Vercel Serverless)
+        await sendOrderEmails(order, items);
         
-        // Enviar correos DESPUÉS (la función sigue viva en Vercel)
-        sendOrderEmails(order, items).catch(e => console.error('Error async emails:', e));
+        res.json({ success: true, order });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
