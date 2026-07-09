@@ -89,6 +89,60 @@ const state = {
     }
 };
 
+// --- TIKTOK EVENTS TRACKING SYSTEM ---
+window.trackTikTokEvent = (eventName, properties = {}, customUserData = {}, customEventId = null) => {
+    // Generate unique event ID for deduplication
+    const eventId = customEventId || `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Get PII info if available from customUserData or state.user
+    const email = customUserData.email || (state.user ? state.user.email : '');
+    const phone = customUserData.phone || (state.user ? state.user.phone : '');
+    const externalId = state.user ? state.user.id : '';
+    
+    // Read the ttp (_ttp) cookie for user matching
+    const getCookie = (name) => {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    };
+    const ttp = getCookie('_ttp') || '';
+
+    // 1. Browser-side tracking
+    if (window.ttq) {
+        window.ttq.track(eventName, properties, { event_id: eventId });
+        console.log(`[TikTok Pixel] Browser event tracked: ${eventName}`, properties, eventId);
+    } else {
+        console.warn(`[TikTok Pixel Warning] ttq is not defined on window`);
+    }
+
+    // 2. Server-side tracking via API
+    fetch('/api/tiktok/event', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            eventName,
+            eventId,
+            userData: {
+                email,
+                phone,
+                externalId,
+                ttp,
+                userAgent: navigator.userAgent
+            },
+            properties,
+            pageUrl: window.location.href
+        })
+    })
+    .then(r => r.json())
+    .then(data => console.log(`[TikTok Events API] Proxy response for ${eventName}:`, data))
+    .catch(err => console.error('[TikTok Events API Proxy Error]:', err));
+    
+    return eventId;
+};
+
 // Migrate old numeric IDs in cart to string prefixes to avoid promotions collisions
 state.cart = state.cart.map(item => {
     if (typeof item.id === 'number') {
@@ -178,7 +232,23 @@ async function loadData() {
                     // --- LISTENER DE AUTENTICACIÓN SUPABASE ---
                     supabaseClient.auth.onAuthStateChange((event, session) => {
                         if (event === 'SIGNED_IN' && session) {
-                            handleLoginSuccess(session.user, session);
+                            const user = session.user;
+                            const createdAt = new Date(user.created_at).getTime();
+                            const lastSignIn = new Date(user.last_sign_in_at).getTime();
+                            // If user was created within the last 10 seconds of sign in, it's a new registration
+                            const isNewReg = Math.abs(lastSignIn - createdAt) < 10000;
+
+                            handleLoginSuccess(user, session);
+
+                            if (isNewReg) {
+                                try {
+                                    window.trackTikTokEvent('CompleteRegistration', {}, {
+                                        email: user.email || ''
+                                    });
+                                } catch (err) {
+                                    console.error('Error tracking CompleteRegistration:', err);
+                                }
+                            }
                         } else if (event === 'SIGNED_OUT') {
                             state.user = null;
                             state.supabaseSession = null;
@@ -459,6 +529,23 @@ window.addToCart = (id, q = null) => {
         state.cart.push({ ...p, id: cartId, quantity: qty });
     }
     updateCartUI(); toggleCart(true);
+
+    // Track TikTok AddToCart event
+    try {
+        window.trackTikTokEvent('AddToCart', {
+            contents: [{
+                content_id: cartId,
+                content_type: 'product',
+                content_name: p.name || p.title || 'Producto',
+                quantity: qty,
+                price: p.price
+            }],
+            value: p.price * qty,
+            currency: 'BOB'
+        });
+    } catch (err) {
+        console.error('Error tracking AddToCart:', err);
+    }
 };
 
 // --- CATÁLOGO HOVER ---
@@ -1218,6 +1305,20 @@ window.navigate = (view, id = null) => {
         state.selectedProduct = state.products.find(p => p.id == id);
         state.detailActiveImg = 0;
         startDetailAutoSlide();
+        
+        if (view === 'detail' && state.selectedProduct) {
+            const p = state.selectedProduct;
+            window.trackTikTokEvent('ViewContent', {
+                contents: [{
+                    content_id: p.id.toString(),
+                    content_type: 'product',
+                    content_name: p.name || p.title || 'Producto',
+                    price: p.price
+                }],
+                value: p.price,
+                currency: 'BOB'
+            });
+        }
     } else {
         clearInterval(state.detailSlideInterval);
     }
@@ -1300,6 +1401,11 @@ window.handleSearch = (query) => {
             state.view = 'catalog';
             params.set('view', 'catalog');
         }
+        
+        // Track TikTok Search event
+        window.trackTikTokEvent('Search', {
+            query: query
+        });
     } else {
         params.delete('search');
     }
@@ -2763,6 +2869,23 @@ function renderCheckout(container) {
     const subtotal = state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const cache = JSON.parse(localStorage.getItem('emma_store_checkout_cache')) || {};
     
+    // Track TikTok InitiateCheckout event
+    try {
+        window.trackTikTokEvent('InitiateCheckout', {
+            contents: state.cart.map(item => ({
+                content_id: item.id,
+                content_type: 'product',
+                content_name: item.name || item.title || 'Producto',
+                quantity: item.quantity,
+                price: item.price
+            })),
+            value: subtotal,
+            currency: 'BOB'
+        });
+    } catch (err) {
+        console.error('Error tracking InitiateCheckout:', err);
+    }
+    
     // Determinar si es usuario logueado
     const isLogged = !!state.user;
     const hasAddresses = isLogged && state.addresses.length > 0;
@@ -3351,6 +3474,26 @@ function renderCheckout(container) {
             showNotification("Por favor, llena los campos obligatorios.");
             return;
         }
+
+        // Track TikTok AddPaymentInfo event
+        try {
+            window.trackTikTokEvent('AddPaymentInfo', {
+                contents: state.cart.map(item => ({
+                    content_id: item.id,
+                    content_type: 'product',
+                    content_name: item.name || item.title || 'Producto',
+                    quantity: item.quantity,
+                    price: item.price
+                })),
+                value: state.cart.reduce((sum, item) => sum + (item.price * item.quantity), 0),
+                currency: 'BOB'
+            }, {
+                email: email,
+                phone: phone
+            });
+        } catch (err) {
+            console.error('Error tracking AddPaymentInfo:', err);
+        }
         
         // Bloquear botón para evitar doble envío y mostrar progreso
         const submitBtn = document.querySelector('button[onclick="window.submitCheckoutForm()"]');
@@ -3526,6 +3669,14 @@ function renderCheckout(container) {
             };
         });
 
+        const getCookie = (name) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return '';
+        };
+        const ttpVal = getCookie('_ttp') || '';
+
         if (state.supabaseSession) {
             // Usuario autenticado: guardar con su user_id
             try {
@@ -3552,7 +3703,8 @@ function renderCheckout(container) {
                         shipping_apartment: apartment,
                         seller_name: seller.name,
                         seller_number: seller.number?.toString(),
-                        items: formattedItems
+                        items: formattedItems,
+                        ttp: ttpVal
                     })
                 });
             } catch (err) {
@@ -3595,7 +3747,8 @@ function renderCheckout(container) {
                             seller_name: seller.name,
                             seller_number: seller.number?.toString()
                         },
-                        items: formattedItems
+                        items: formattedItems,
+                        ttp: ttpVal
                     })
                 });
             } catch (err) {
@@ -3611,6 +3764,26 @@ function renderCheckout(container) {
                 }
                 return;
             }
+        }
+
+        // Track TikTok Purchase and PlaceAnOrder client-side
+        try {
+            const eventId = `ord_${orderNumber}`;
+            const purchaseProps = {
+                contents: formattedItems.map(item => ({
+                    content_id: item.product_id ? item.product_id.toString() : '',
+                    content_type: 'product',
+                    content_name: item.product_name,
+                    quantity: item.quantity,
+                    price: item.price
+                })),
+                value: totalCost,
+                currency: 'BOB'
+            };
+            window.trackTikTokEvent('PlaceAnOrder', purchaseProps, { email, phone }, eventId);
+            window.trackTikTokEvent('Purchase', purchaseProps, { email, phone }, eventId);
+        } catch (err) {
+            console.error('Error tracking Purchase client-side:', err);
         }
             
             // Fallback: también guardar en localStorage

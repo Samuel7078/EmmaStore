@@ -132,6 +132,77 @@ function hashPassword(password) {
     return `${salt}:${hash}`;
 }
 
+// --- HELPERS TIKTOK EVENTS API ---
+
+function sha256Hash(value) {
+    if (!value) return undefined;
+    const cleanValue = value.toString().trim().toLowerCase();
+    return crypto.createHash('sha256').update(cleanValue).digest('hex');
+}
+
+function getCookieFromHeader(cookieHeader, name) {
+    if (!cookieHeader) return '';
+    const cookies = cookieHeader.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.startsWith(name + '=')) {
+            return cookie.substring(name.length + 1);
+        }
+    }
+    return '';
+}
+
+async function sendTikTokEvent(eventName, eventId, userData = {}, properties = {}, pageUrl = '') {
+    const pixelId = process.env.TIKTOK_PIXEL_ID || 'D97H09JC77U6KOKLG4EG';
+    const accessToken = process.env.TIKTOK_ACCESS_TOKEN || '81aa84c2ec4a2a62737d01f42436daaa5fb0d764';
+
+    const userPayload = {};
+    
+    // Hash PII fields
+    if (userData.email) userPayload.email = sha256Hash(userData.email);
+    if (userData.phone) userPayload.phone = sha256Hash(userData.phone);
+    if (userData.externalId) userPayload.external_id = sha256Hash(userData.externalId);
+    
+    // Unhashed fields
+    if (userData.ip) userPayload.ip = userData.ip;
+    if (userData.userAgent) userPayload.user_agent = userData.userAgent;
+    if (userData.ttp) userPayload.ttp = userData.ttp;
+    if (userData.ttclid) userPayload.ttclid = userData.ttclid;
+
+    const eventData = {
+        event: eventName,
+        event_time: Math.floor(Date.now() / 1000),
+        event_id: eventId || `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        user: userPayload,
+        properties: properties
+    };
+
+    if (pageUrl) {
+        eventData.page = { url: pageUrl };
+    }
+
+    try {
+        const response = await fetch('https://business-api.tiktok.com/open_api/v1.3/event/track/', {
+            method: 'POST',
+            headers: {
+                'Access-Token': accessToken,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                event_source: 'web',
+                event_source_id: pixelId,
+                data: [eventData]
+            })
+        });
+        const resJson = await response.json();
+        console.log(`TikTok Events API [${eventName}] response:`, JSON.stringify(resJson));
+        return resJson;
+    } catch (error) {
+        console.error(`Error sending event [${eventName}] to TikTok Events API:`, error);
+        return { error: error.message };
+    }
+}
+
 // --- MIDDLEWARE: Autenticación Supabase ---
 async function requireAuth(req, res, next) {
     const authHeader = req.headers.authorization;
@@ -180,6 +251,32 @@ app.get('/api/config', (req, res) => {
         supabaseUrl: process.env.SUPABASE_URL,
         supabaseAnonKey: process.env.SUPABASE_ANON_KEY
     });
+});
+
+app.post('/api/tiktok/event', async (req, res) => {
+    try {
+        const { eventName, eventId, userData = {}, properties = {}, pageUrl } = req.body;
+
+        // Auto-fill IP and User-Agent from server request headers
+        const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+        const userAgent = req.headers['user-agent'];
+        
+        // Get _ttp cookie from headers if not provided
+        const ttp = userData.ttp || getCookieFromHeader(req.headers.cookie, '_ttp');
+
+        const mergedUserData = {
+            ...userData,
+            ip,
+            userAgent,
+            ttp
+        };
+
+        const result = await sendTikTokEvent(eventName, eventId, mergedUserData, properties, pageUrl);
+        res.json({ success: true, result });
+    } catch (err) {
+        console.error("Error in /api/tiktok/event route:", err);
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.get('/api/admin/email-settings', async (req, res) => {
@@ -943,6 +1040,42 @@ app.post('/api/public/orders', async (req, res) => {
             await supabaseAdmin.from('order_items').insert(orderItems);
         }
 
+        // --- EVENTO TIKTOK ADS (Server-Side) ---
+        try {
+            const eventId = `ord_${orderData.order_number}`;
+            const ttp = req.body.ttp || getCookieFromHeader(req.headers.cookie, '_ttp');
+            const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+            const userAgent = req.headers['user-agent'];
+            
+            const userData = {
+                email: orderData.contact_email,
+                phone: orderData.contact_phone,
+                ip,
+                userAgent,
+                ttp
+            };
+            
+            const properties = {
+                contents: items.map(item => ({
+                    content_id: (item.product_id || item.id || '').toString(),
+                    content_type: 'product',
+                    content_name: item.product_name || item.name,
+                    quantity: parseInt(item.quantity) || 1,
+                    price: parseFloat(item.price) || 0
+                })),
+                value: parseFloat(orderData.total) || 0,
+                currency: 'BOB'
+            };
+            
+            // Send events asynchronously but await to ensure completion in Vercel Serverless environment
+            await Promise.allSettled([
+                sendTikTokEvent('PlaceAnOrder', eventId, userData, properties, req.headers.referer || ''),
+                sendTikTokEvent('Purchase', eventId, userData, properties, req.headers.referer || '')
+            ]);
+        } catch (tkErr) {
+            console.error('Error disparando eventos de TikTok en /api/public/orders:', tkErr);
+        }
+
         // Enviar correos y esperar a que se completen antes de responder (esencial en Vercel Serverless)
         await sendOrderEmails(order, items);
         
@@ -1004,6 +1137,43 @@ app.post('/api/user/orders', requireAuth, async (req, res) => {
         
         if (itemsError) return res.status(400).json({ error: itemsError.message });
         
+        // --- EVENTO TIKTOK ADS (Server-Side) ---
+        try {
+            const eventId = `ord_${order_number}`;
+            const ttp = req.body.ttp || getCookieFromHeader(req.headers.cookie, '_ttp');
+            const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress || req.ip;
+            const userAgent = req.headers['user-agent'];
+            
+            const userData = {
+                email: contact_email,
+                phone: contact_phone,
+                externalId: req.user.id,
+                ip,
+                userAgent,
+                ttp
+            };
+            
+            const properties = {
+                contents: items.map(item => ({
+                    content_id: (item.product_id || item.id || '').toString(),
+                    content_type: 'product',
+                    content_name: item.product_name || item.name,
+                    quantity: parseInt(item.quantity) || 1,
+                    price: parseFloat(item.price) || 0
+                })),
+                value: parseFloat(total) || 0,
+                currency: 'BOB'
+            };
+            
+            // Send events asynchronously but await to ensure completion in Vercel Serverless environment
+            await Promise.allSettled([
+                sendTikTokEvent('PlaceAnOrder', eventId, userData, properties, req.headers.referer || ''),
+                sendTikTokEvent('Purchase', eventId, userData, properties, req.headers.referer || '')
+            ]);
+        } catch (tkErr) {
+            console.error('Error disparando eventos de TikTok en /api/user/orders:', tkErr);
+        }
+
         // Enviar correos y esperar a que se completen antes de responder (esencial en Vercel Serverless)
         await sendOrderEmails(order, items);
         
