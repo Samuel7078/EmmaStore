@@ -1056,6 +1056,8 @@ app.post('/api/public/orders', async (req, res) => {
             };
             
             const properties = {
+                content_id: items.map(item => (item.product_id || item.id || '').toString()),
+                content_type: 'product',
                 contents: items.map(item => ({
                     content_id: (item.product_id || item.id || '').toString(),
                     content_type: 'product',
@@ -1154,6 +1156,8 @@ app.post('/api/user/orders', requireAuth, async (req, res) => {
             };
             
             const properties = {
+                content_id: items.map(item => (item.product_id || item.id || '').toString()),
+                content_type: 'product',
                 contents: items.map(item => ({
                     content_id: (item.product_id || item.id || '').toString(),
                     content_type: 'product',

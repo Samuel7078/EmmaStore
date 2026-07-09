@@ -533,6 +533,8 @@ window.addToCart = (id, q = null) => {
     // Track TikTok AddToCart event
     try {
         window.trackTikTokEvent('AddToCart', {
+            content_id: cartId.toString(),
+            content_type: 'product',
             contents: [{
                 content_id: cartId,
                 content_type: 'product',
@@ -1309,6 +1311,8 @@ window.navigate = (view, id = null) => {
         if (view === 'detail' && state.selectedProduct) {
             const p = state.selectedProduct;
             window.trackTikTokEvent('ViewContent', {
+                content_id: p.id.toString(),
+                content_type: 'product',
                 contents: [{
                     content_id: p.id.toString(),
                     content_type: 'product',
@@ -2872,8 +2876,10 @@ function renderCheckout(container) {
     // Track TikTok InitiateCheckout event
     try {
         window.trackTikTokEvent('InitiateCheckout', {
+            content_id: state.cart.map(item => item.id.toString()),
+            content_type: 'product',
             contents: state.cart.map(item => ({
-                content_id: item.id,
+                content_id: item.id.toString(),
                 content_type: 'product',
                 content_name: item.name || item.title || 'Producto',
                 quantity: item.quantity,
@@ -3478,8 +3484,10 @@ function renderCheckout(container) {
         // Track TikTok AddPaymentInfo event
         try {
             window.trackTikTokEvent('AddPaymentInfo', {
+                content_id: state.cart.map(item => item.id.toString()),
+                content_type: 'product',
                 contents: state.cart.map(item => ({
-                    content_id: item.id,
+                    content_id: item.id.toString(),
                     content_type: 'product',
                     content_name: item.name || item.title || 'Producto',
                     quantity: item.quantity,
@@ -3770,6 +3778,8 @@ function renderCheckout(container) {
         try {
             const eventId = `ord_${orderNumber}`;
             const purchaseProps = {
+                content_id: formattedItems.map(item => item.product_id ? item.product_id.toString() : ''),
+                content_type: 'product',
                 contents: formattedItems.map(item => ({
                     content_id: item.product_id ? item.product_id.toString() : '',
                     content_type: 'product',
